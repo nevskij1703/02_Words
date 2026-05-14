@@ -224,7 +224,21 @@ export async function mountGame(app, allLevels) {
     if (idx === 0 && tutorial.shouldRun()) {
       setTimeout(() => {
         if (storage.getCurrentLevel() === 0 && tutorial.shouldRun()) {
-          tutorialControl = tutorial.run(els.wheelEl, level.mainWords);
+          tutorialControl = tutorial.run(els.wheelEl, {
+            // Тутор каждый раз спрашивает: «какое слово сейчас показывать?».
+            // Возвращаем самое короткое из main-слов, которые ещё не открыты.
+            // Если все главные слова найдены — null → тутор завершится.
+            getNextTarget: () => {
+              if (!game || !level) return null;
+              const found = new Set(game.getFoundMain().map(w => String(w).toUpperCase()));
+              const unfound = level.mainWords
+                .map(w => String(w).toUpperCase())
+                .filter(w => !found.has(w));
+              if (unfound.length === 0) return null;
+              return unfound.slice().sort((a, b) => a.length - b.length)[0];
+            },
+            maxSteps: 3
+          });
         }
       }, 500);
     }

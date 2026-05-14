@@ -1,35 +1,30 @@
-// tutorial.js — простой обучающий оверлей для первого уровня.
+// tutorial.js — обучающий оверлей для первого уровня.
 //
-// Показывает анимированную «руку» (круг с точкой), которая по очереди наводится
-// на буквы первых 3 (самых коротких) слов уровня — не свайпая, не сабмитя.
-// Игрок видит «как», но проходит сам.
+// Поведение:
+//   1. На каждом шаге тутор берёт самое короткое из ЕЩЁ НЕ НАЙДЕННЫХ
+//      main-слов (через колбэк getNextTarget от ui.js → game.js).
+//      Закэшировать на старте нельзя: игрок может найти слово сам, и тогда
+//      следующая итерация должна показать другое.
+//   2. Демо повторяется, пока игрок не введёт показанное слово.
+//      После этого засчитываем шаг и берём следующее ненайденное.
+//   3. Максимум 3 шага; если все слова закончились раньше — заканчиваем.
 //
-// Завершение:
-//   - после демонстрации всех 3 слов;
-//   - либо если игрок успел сам найти слово до окончания демо.
-// В обоих случаях помечает tutorialShown=true в storage.
+// Линия трассы рисуется ВСЛЕД за движением руки (rAF-интерполяция,
+// синхронизированная с CSS-транзишеном left/top 480ms).
 
 import * as storage from './storage.js';
 
-// Тутор показывается на первом уровне ровно один раз — пока игрок не
-// прошёл ни одного уровня. Раньше использовался отдельный флаг
-// `tutorialShown` в settings, но он перетекал между тестовыми сессиями
-// и мешал увидеть тутор после сброса прогресса. Теперь критерий простой
-// и совпадает с интуицией: "новый игрок" == пустой completedLevels.
+// Тутор стартует на первом уровне, пока игрок не прошёл ни один уровень.
 export function shouldRun() {
   const state = storage.getState();
   return !(state.completedLevels && state.completedLevels.length > 0);
 }
 
-// No-op (оставлено для обратной совместимости вызовов внутри tutorial.js).
 export function markDone() {
-  // Ничего не делаем — тутор больше не помечается флагом.
-  // Завершение наступает естественно: либо демо проиграно до конца,
-  // либо игрок свайпнул main-слово (ui.js вызовет cancel()).
+  // No-op (поведение завязано на completedLevels — флаг больше не пишется).
 }
 
-// Минималистичный вектор-указатель в палитре Aurora.
-// Градиентная заливка (фиолетовый → розовый), без контура.
+// Минималистичный вектор-указатель в палитре Aurora (без обводки).
 const HAND_SVG = `
 <svg viewBox="0 0 24 24" width="46" height="46" aria-hidden="true">
   <defs>
@@ -47,35 +42,51 @@ const HAND_SVG = `
 </svg>
 `.trim();
 
-export function run(wheelEl, mainWords) {
-  // Берём 3 самых коротких слова — удобнее для первого опыта.
-  const words = [...mainWords].sort((a, b) => a.length - b.length).slice(0, 3).map(w => w.toUpperCase());
-  if (words.length === 0) {
+const HAND_MOVE_MS = 480;     // должно совпадать с CSS-транзишеном setHandPos
+const TRAIL_ANIM_MS = 480;    // линия растёт ровно столько же времени
+const PAUSE_AT_LETTER_MS = 180;
+const PAUSE_FIRST_MS = 700;
+const PAUSE_END_MS = 600;
+const PAUSE_BETWEEN_LOOPS_MS = 900;
+
+export function run(wheelEl, options = {}) {
+  // Совместимость со старой сигнатурой run(wheelEl, mainWordsArray).
+  let getNextTarget;
+  let maxSteps;
+  if (Array.isArray(options)) {
+    const words = [...options].sort((a, b) => a.length - b.length).slice(0, 3).map(w => w.toUpperCase());
+    let idx = 0;
+    getNextTarget = () => idx < words.length ? words[idx] : null;
+    // bumpIdx после успешного шага не нужен — тутор сам решает по cancelCurrent.
+    // На старом API теряем динамическую отдачу — оставлено как fallback.
+    maxSteps = words.length;
+  } else {
+    getNextTarget = typeof options.getNextTarget === 'function' ? options.getNextTarget : () => null;
+    maxSteps = options.maxSteps || 3;
+  }
+
+  if (!getNextTarget()) {
     markDone();
     return { cancel() {}, notifyWordFound() {} };
   }
 
   let cancelled = false;
   let cancelCurrent = false;        // прерывание текущей итерации demoWord
-  let currentIdx = 0;               // индекс активного туторного слова
-  const foundWords = new Set();     // какие туторные слова игрок уже ввёл
+  let stepsCompleted = 0;           // сколько слов уже пройдено через тутор
+  let currentTarget = null;         // слово, которое сейчас показывается
 
   const hand = document.createElement('div');
   hand.className = 'tut-hand';
   hand.innerHTML = HAND_SVG;
   wheelEl.appendChild(hand);
 
-  // Полупрозрачная трасса — такого же цвета, как боевая, но прозрачнее.
-  // Подмешиваем в существующий SVG-overlay колеса.
+  // Полупрозрачная трасса — отдельная polyline в существующем SVG колеса.
   // Использует тот же градиент, что и боевая трасса (см. input.js).
-  // Стрим строится через querySelector — `<defs>` уже в wheelSvg есть.
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const wheelSvg = wheelEl.querySelector('.wheel-svg');
   let tutPolyline = null;
   let tutGradId = null;
   if (wheelSvg) {
-    // Заводим собственный градиент с отдельным id, чтобы opacity для трассы
-    // тутора управлялся независимо.
     const existingGrad = wheelSvg.querySelector('defs linearGradient');
     if (existingGrad) tutGradId = existingGrad.id;
     tutPolyline = document.createElementNS(SVG_NS, 'polyline');
@@ -88,7 +99,9 @@ export function run(wheelEl, mainWords) {
     tutPolyline.classList.add('tut-trail');
     wheelSvg.appendChild(tutPolyline);
   }
+  // Точки уже «зафиксированных» сегментов трассы (последняя точка = текущий конец).
   const visitedPts = [];
+  let trailAnimRAF = 0;
 
   function refreshTrail() {
     if (!tutPolyline) return;
@@ -103,8 +116,48 @@ export function run(wheelEl, mainWords) {
   }
 
   function clearTrail() {
+    cancelTrailAnim();
     visitedPts.length = 0;
     refreshTrail();
+  }
+
+  function cancelTrailAnim() {
+    if (trailAnimRAF) {
+      cancelAnimationFrame(trailAnimRAF);
+      trailAnimRAF = 0;
+    }
+  }
+
+  // Анимированно «протягивает» линию от текущего конца до toPt за durationMs.
+  // Добавляет новую точку в visitedPts и подвигает её во времени; в конце
+  // точка стоит ровно в toPt.
+  function animateTrailTo(toPt, durationMs) {
+    if (!tutPolyline) return;
+    cancelTrailAnim();
+    if (visitedPts.length === 0) {
+      visitedPts.push({ x: toPt.x, y: toPt.y });
+      refreshTrail();
+      return;
+    }
+    const start = visitedPts[visitedPts.length - 1];
+    const fromX = start.x, fromY = start.y;
+    visitedPts.push({ x: fromX, y: fromY });
+    const movingIdx = visitedPts.length - 1;
+    const t0 = performance.now();
+    const easeInOut = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    function step(now) {
+      const t = Math.min(1, (now - t0) / durationMs);
+      const e = easeInOut(t);
+      visitedPts[movingIdx].x = fromX + (toPt.x - fromX) * e;
+      visitedPts[movingIdx].y = fromY + (toPt.y - fromY) * e;
+      refreshTrail();
+      if (t < 1 && !cancelled) {
+        trailAnimRAF = requestAnimationFrame(step);
+      } else {
+        trailAnimRAF = 0;
+      }
+    }
+    trailAnimRAF = requestAnimationFrame(step);
   }
 
   // Текстовая подсказка над колесом — какое слово показываем.
@@ -121,14 +174,14 @@ export function run(wheelEl, mainWords) {
   }
 
   function setHandPos(x, y, animate = true) {
-    hand.style.transition = animate ? 'left 480ms ease-in-out, top 480ms ease-in-out' : 'none';
+    hand.style.transition = animate
+      ? `left ${HAND_MOVE_MS}ms ease-in-out, top ${HAND_MOVE_MS}ms ease-in-out`
+      : 'none';
     hand.style.left = `${x}px`;
     hand.style.top  = `${y}px`;
   }
 
-  function wait(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
+  function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
   async function demoWord(word) {
     if (cancelled) return;
@@ -143,25 +196,24 @@ export function run(wheelEl, mainWords) {
     refreshTrail();
     hand.classList.add('visible');
     hand.classList.add('pulse');
-    await wait(700);
+    await wait(PAUSE_FIRST_MS);
     for (let i = 1; i < word.length; i++) {
       if (cancelled || cancelCurrent) break;
       const p = getLetterPos(word[i]);
       if (!p) continue;
       hand.classList.remove('pulse');
-      // Линия рисуется чуть раньше движения руки — рука «идёт по следу».
-      visitedPts.push({ x: p.x, y: p.y });
-      refreshTrail();
+      // Линия и рука стартуют одновременно и идут одинаковую длительность.
+      animateTrailTo({ x: p.x, y: p.y }, TRAIL_ANIM_MS);
       setHandPos(p.x, p.y, true);
-      await wait(520);
+      await wait(HAND_MOVE_MS + 40);
       if (cancelled || cancelCurrent) break;
       hand.classList.add('pulse');
-      await wait(180);
+      await wait(PAUSE_AT_LETTER_MS);
     }
-    if (!cancelled && !cancelCurrent) await wait(600);
+    if (!cancelled && !cancelCurrent) await wait(PAUSE_END_MS);
+    cancelTrailAnim();
     hand.classList.remove('pulse', 'visible');
     label.classList.remove('visible');
-    // Аккуратно гасим линию: уменьшаем opacity, потом стираем.
     if (tutPolyline) tutPolyline.style.transition = 'opacity 400ms';
     if (tutPolyline) tutPolyline.style.opacity = '0';
     await wait(420);
@@ -171,24 +223,28 @@ export function run(wheelEl, mainWords) {
 
   async function play() {
     await wait(800);
-    while (!cancelled) {
+    while (!cancelled && stepsCompleted < maxSteps) {
       cancelCurrent = false;
-      // Перематываем currentIdx через уже найденные туторные слова.
-      while (currentIdx < words.length && foundWords.has(words[currentIdx])) {
-        currentIdx++;
-      }
-      if (currentIdx >= words.length) break;
-      await demoWord(words[currentIdx]);
+      // Получаем актуальную цель: самое короткое ненайденное main-слово.
+      const target = (getNextTarget() || '').toString().toUpperCase();
+      if (!target) break;
+      currentTarget = target;
+      await demoWord(target);
       if (cancelled) break;
-      // Если демо не было прервано (игрок ещё не нашёл слово),
-      // делаем паузу и повторяем то же самое слово.
-      if (!cancelCurrent) await wait(900);
+      if (cancelCurrent) {
+        // Игрок ввёл показанное слово — засчитываем шаг и берём следующее.
+        stepsCompleted++;
+      } else {
+        // Демо завершилось без угадывания — пауза и повторяем то же слово.
+        await wait(PAUSE_BETWEEN_LOOPS_MS);
+      }
     }
     finish();
   }
 
   function finish() {
     cancelled = true;
+    cancelTrailAnim();
     hand.classList.add('fade-out');
     label.classList.add('fade-out');
     if (tutPolyline) {
@@ -208,17 +264,13 @@ export function run(wheelEl, mainWords) {
   return {
     cancel: finish,
     // ui.js дёргает это при word-main событии (игрок угадал слово).
-    // Если это туторное слово — продвигаем индекс и прерываем текущее демо;
-    // если просто main-слово вне тутор-набора — запоминаем, но демо
-    // продолжает идти на том же слове.
+    // Если это слово, которое сейчас показывается — прерываем демо
+    // и продвигаем счётчик. Любое другое слово игнорируем (на следующей
+    // итерации getNextTarget сам учтёт его как найденное).
     notifyWordFound(word) {
       if (cancelled) return;
-      const w = (word || '').toUpperCase();
-      foundWords.add(w);
-      // Прерываем текущее демо, только если это слово сейчас демонстрируется.
-      // Слова, найденные «вне очереди», запоминаем в foundWords и пропустим
-      // их, когда они станут текущей целью.
-      if (currentIdx < words.length && words[currentIdx] === w) {
+      const w = (word || '').toString().toUpperCase();
+      if (currentTarget && w === currentTarget) {
         cancelCurrent = true;
       }
     }
