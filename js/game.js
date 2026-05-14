@@ -30,6 +30,7 @@ export function createGame({ onEvent = () => {}, crossword = null } = {}) {
   let mainSet = new Set();
   let wrongStreak = 0;
   let hintBannerVisible = false;
+  let levelCompleteEmitted = false;
 
   function noteWrong() {
     wrongStreak++;
@@ -57,11 +58,46 @@ export function createGame({ onEvent = () => {}, crossword = null } = {}) {
     bonusSet = new Set((lv.bonusWords || []).map(normalize));
     wrongStreak = 0;
     hintBannerVisible = false;
+    levelCompleteEmitted = false;
 
     // Учитываем уже найденные ранее бонусы из storage (по идее их игрок
     // нашёл при предыдущем заходе на уровень).
     const saved = storage.getFoundBonus(lv.id);
     for (const w of saved) foundBonus.add(normalize(w));
+  }
+
+  // Идемпотентная эмиссия level-complete (один раз за уровень).
+  function emitLevelComplete() {
+    if (levelCompleteEmitted) return;
+    levelCompleteEmitted = true;
+    storage.markLevelCompleted(level.id);
+    onEvent({ type: 'level-complete' });
+  }
+
+  // Проверяет все ненайденные main-слова: если все их ячейки открыты —
+  // авто-зачитывает. Вызывается после каждого открытия ячеек (подсказка,
+  // успешный свайп, чит-скип). Закрывает баг с «перекрестьем».
+  function checkAndMarkRevealedWords() {
+    if (!level || !cw) return;
+    const cells = cw.getCells();
+    for (let i = 0; i < level.placements.length; i++) {
+      const p = level.placements[i];
+      const word = normalize(p.word);
+      if (foundMain.has(word)) continue;
+      if (!mainSet.has(word)) continue;
+      let allRevealed = true;
+      for (let k = 0; k < word.length; k++) {
+        const r = p.direction === 'horizontal' ? p.row : p.row + k;
+        const c = p.direction === 'horizontal' ? p.col + k : p.col;
+        const cell = cells[r] && cells[r][c];
+        if (!cell || !cell.revealed) { allRevealed = false; break; }
+      }
+      if (!allRevealed) continue;
+      foundMain.add(word);
+      storage.incWordsFound(1);
+      onEvent({ type: 'word-main', word, placementIdx: i, auto: true });
+    }
+    if (isLevelComplete()) emitLevelComplete();
   }
 
   function submitWord(word) {
@@ -88,10 +124,12 @@ export function createGame({ onEvent = () => {}, crossword = null } = {}) {
       const placementIdx = level.placements.findIndex(p => normalize(p.word) === w);
       if (cw && placementIdx >= 0) cw.revealPlacement(placementIdx);
       onEvent({ type: 'word-main', word: w, placementIdx });
-      if (isLevelComplete()) {
-        storage.markLevelCompleted(level.id);
-        onEvent({ type: 'level-complete' });
-      }
+      // Эмиссия level-complete по списку слов (быстрый путь — последнее слово
+      // игрок набрал сам).
+      if (isLevelComplete()) emitLevelComplete();
+      // После анимации раскрытия placement-а проверяем, не открылись ли
+      // другие слова через общие буквы.
+      setTimeout(() => checkAndMarkRevealedWords(), w.length * 80 + 80);
       return { kind: 'main', placementIdx };
     }
     // Bonus?
@@ -131,28 +169,24 @@ export function createGame({ onEvent = () => {}, crossword = null } = {}) {
     noteValid();
     onEvent({ type: 'hint', cell, hintsLeft: storage.getHints() });
 
-    // Если подсказка раскрыла последнюю закрытую ячейку — авто-зачёт
-    // оставшихся ненайденных слов и переход к экрану «Уровень пройден».
-    if (cw.isAllRevealed()) {
-      autoCompleteRemaining();
-    }
+    // Подсказка могла открыть последнюю ячейку какого-нибудь слова
+    // (часто на перекрестии). Проверяем все слова — авто-зачитываем те,
+    // у которых все ячейки уже видны.
+    checkAndMarkRevealedWords();
     return true;
   }
 
   // Авто-зачитывает все ненайденные mainWords (например, после полного
-  // раскрытия сетки подсказками). Эмитит word-main событие на каждое.
+  // раскрытия сетки подсказками или из чит-панели). Эмитит word-main событие на каждое.
   function autoCompleteRemaining() {
     for (const w of mainSet) {
       if (foundMain.has(w)) continue;
       foundMain.add(w);
       storage.incWordsFound(1);
       const placementIdx = level.placements.findIndex(p => normalize(p.word) === w);
-      onEvent({ type: 'word-main', word: w, placementIdx });
+      onEvent({ type: 'word-main', word: w, placementIdx, auto: true });
     }
-    if (isLevelComplete()) {
-      storage.markLevelCompleted(level.id);
-      onEvent({ type: 'level-complete' });
-    }
+    if (isLevelComplete()) emitLevelComplete();
   }
 
   // Принудительно завершить уровень (из чит-панели). Раскрывает все ячейки и
