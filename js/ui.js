@@ -7,6 +7,7 @@ import * as audio from './audio.js';
 import * as ads from './ads.js';
 import * as storage from './storage.js';
 import { CONFIG } from './config.js';
+import { showCheatPanel, attachSecretTap, setHooks as setCheatHooks } from './cheatPanel.js';
 
 // === Сборка статической разметки ===
 function buildLayout(app) {
@@ -22,10 +23,6 @@ function buildLayout(app) {
     <div class="bonus-row" id="bonus-row"></div>
     <div class="current-word" id="current-word"></div>
     <div class="wheel-area">
-      <div class="wheel-controls">
-        <button class="icon-btn" id="btn-reset" title="Сбросить">✖</button>
-        <button class="icon-btn" id="btn-shuffle" title="Перемешать">🔀</button>
-      </div>
       <div class="wheel" id="wheel"></div>
     </div>
   `;
@@ -42,8 +39,6 @@ export async function mountGame(app, allLevels) {
     crosswordW: app.querySelector('#crossword-wrap'),
     bonusRow:   app.querySelector('#bonus-row'),
     currentWord:app.querySelector('#current-word'),
-    resetBtn:   app.querySelector('#btn-reset'),
-    shuffleBtn: app.querySelector('#btn-shuffle'),
     wheelEl:    app.querySelector('#wheel')
   };
 
@@ -153,18 +148,6 @@ export async function mountGame(app, allLevels) {
   }
 
   // === Кнопки ===
-  els.shuffleBtn.addEventListener('click', () => {
-    audio.play('click');
-    if (wheel) wheel.shuffle();
-  });
-
-  els.resetBtn.addEventListener('click', () => {
-    audio.play('click');
-    if (wheel) wheel.reset();
-    els.currentWord.textContent = '';
-    els.currentWord.className = 'current-word';
-  });
-
   els.hintBtn.addEventListener('click', () => {
     audio.play('click');
     if (game) game.useHint();
@@ -254,11 +237,30 @@ export async function mountGame(app, allLevels) {
     });
   }
 
+  // === Чит-панель (5 быстрых тапов по заголовку уровня) ===
+  setCheatHooks({
+    totalLevels: allLevels.length,
+    onJumpTo: (idx) => {
+      currentLevelIdx = Math.max(0, Math.min(allLevels.length - 1, idx));
+      loadLevel(currentLevelIdx);
+    },
+    onCompleteLevel: () => {
+      if (game) game.forceComplete();
+    }
+  });
+  attachSecretTap(els.levelInfo, () => showCheatPanel());
+
+  // Также: query-параметр ?cheat=1 откроет панель сразу.
+  if (new URLSearchParams(location.search).get('cheat') === '1') {
+    setTimeout(() => showCheatPanel(), 200);
+  }
+
   // === Запуск ===
   await loadLevel(currentLevelIdx);
 
   return {
     nextLevel: () => loadLevel(currentLevelIdx + 1),
-    reload:    () => loadLevel(currentLevelIdx)
+    reload:    () => loadLevel(currentLevelIdx),
+    showCheatPanel
   };
 }

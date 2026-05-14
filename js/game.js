@@ -102,13 +102,45 @@ export function createGame({ onEvent = () => {}, crossword = null } = {}) {
     if (!cell) return false;
     storage.spendHint();
     onEvent({ type: 'hint', cell, hintsLeft: storage.getHints() });
+
+    // Если подсказка раскрыла последнюю закрытую ячейку — авто-зачёт
+    // оставшихся ненайденных слов и переход к экрану «Уровень пройден».
+    if (cw.isAllRevealed()) {
+      autoCompleteRemaining();
+    }
     return true;
+  }
+
+  // Авто-зачитывает все ненайденные mainWords (например, после полного
+  // раскрытия сетки подсказками). Эмитит word-main событие на каждое.
+  function autoCompleteRemaining() {
+    for (const w of mainSet) {
+      if (foundMain.has(w)) continue;
+      foundMain.add(w);
+      storage.incWordsFound(1);
+      const placementIdx = level.placements.findIndex(p => normalize(p.word) === w);
+      onEvent({ type: 'word-main', word: w, placementIdx });
+    }
+    if (isLevelComplete()) {
+      storage.markLevelCompleted(level.id);
+      onEvent({ type: 'level-complete' });
+    }
+  }
+
+  // Принудительно завершить уровень (из чит-панели). Раскрывает все ячейки и
+  // авто-зачитывает оставшиеся слова, эмитя level-complete.
+  function forceComplete() {
+    if (!cw || !level) return;
+    // Раскрываем оставшиеся ячейки.
+    while (cw.revealRandomHiddenCell()) { /* loop */ }
+    autoCompleteRemaining();
   }
 
   return {
     loadLevel,
     submitWord,
     useHint,
+    forceComplete,
     isLevelComplete,
     getFoundMain: () => [...foundMain],
     getFoundBonus: () => [...foundBonus],
