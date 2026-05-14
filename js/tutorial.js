@@ -11,15 +11,21 @@
 
 import * as storage from './storage.js';
 
-const TUTORIAL_KEY = 'tutorialShown';
-
+// Тутор показывается на первом уровне ровно один раз — пока игрок не
+// прошёл ни одного уровня. Раньше использовался отдельный флаг
+// `tutorialShown` в settings, но он перетекал между тестовыми сессиями
+// и мешал увидеть тутор после сброса прогресса. Теперь критерий простой
+// и совпадает с интуицией: "новый игрок" == пустой completedLevels.
 export function shouldRun() {
-  const s = storage.getSettings();
-  return !s[TUTORIAL_KEY];
+  const state = storage.getState();
+  return !(state.completedLevels && state.completedLevels.length > 0);
 }
 
+// No-op (оставлено для обратной совместимости вызовов внутри tutorial.js).
 export function markDone() {
-  storage.setSetting(TUTORIAL_KEY, true);
+  // Ничего не делаем — тутор больше не помечается флагом.
+  // Завершение наступает естественно: либо демо проиграно до конца,
+  // либо игрок свайпнул main-слово (ui.js вызовет cancel()).
 }
 
 // Минималистичный вектор-указатель: рука, индексный палец вверх (Material-style).
