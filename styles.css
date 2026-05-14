@@ -68,19 +68,19 @@ button {
 
 .icon-btn {
   position: relative;
-  width: 80px;
-  height: 80px;
-  border-radius: 22px;
+  width: 54px;
+  height: 54px;
+  border-radius: 15px;
   background: rgba(255,255,255,0.15);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 36px;
+  font-size: 24px;
   color: #fff;
   transition: transform 0.1s, background 0.2s;
 }
 .icon-btn:active { transform: scale(0.92); }
-.icon-btn.icon-svg svg { display: block; width: 42px; height: 42px; }
+.icon-btn.icon-svg svg { display: block; width: 28px; height: 28px; }
 .icon-btn .badge {
   position: absolute;
   top: -6px;
