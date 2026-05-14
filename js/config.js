@@ -12,7 +12,7 @@ export const CONFIG = {
   // === РЕКЛАМА ===
   ADS: {
     useMock: true,                  // false → пытаться использовать Yandex SDK
-    interstitialEveryN: 3,          // показывать межстраничную каждые N уровней
+    interstitialEveryN: 1,          // показывать межстраничную каждые N уровней (1 = после каждого)
     mockInterstitialDurationMs: 1500,
     mockRewardedDurationMs: 2000
   },
