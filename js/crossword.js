@@ -46,8 +46,9 @@ export function render(level, container) {
   grid.className = 'crossword-grid';
   grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
 
-  // Чтобы кроссворд хорошо умещался по ширине: ограничим максимальную ширину сетки.
-  const maxCellPx = 56;
+  // Ширину ограничиваем меньшим из (доступная ширина, cols × maxCellPx).
+  // Для плотных кроссвордов (11×11) на 350px-телефоне ячейка будет ~30px.
+  const maxCellPx = cols >= 9 ? 40 : 52;
   grid.style.maxWidth = `${cols * maxCellPx}px`;
   grid.style.width = '100%';
 
@@ -83,12 +84,15 @@ export function render(level, container) {
     const data = cells[r][c];
     const el = cellEls[r][c];
     if (!data || data.revealed) return false;
-    setTimeout(() => {
+    const apply = () => {
       data.revealed = true;
       el.dataset.revealed = 'true';
       el.classList.add('flip');
       el.addEventListener('animationend', () => el.classList.remove('flip'), { once: true });
-    }, delayMs);
+    };
+    // Для delayMs=0 — синхронно, чтобы isAllRevealed() сразу видел изменение.
+    if (delayMs > 0) setTimeout(apply, delayMs);
+    else apply();
     return true;
   }
 

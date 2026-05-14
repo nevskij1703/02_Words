@@ -5,7 +5,7 @@ export const CONFIG = {
   // === БАЛАНС ===
   BALANCE: {
     startingHints: 5,          // подсказок на старте новой игры
-    hintsPerRewardedAd: 1,     // сколько подсказок дать за просмотр rewarded
+    hintsPerRewardedAd: 3,     // сколько подсказок дать за просмотр rewarded
     minLevelDurationMs: 30_000 // ниже — статистика не учитывается (антифрод)
   },
 
@@ -24,15 +24,18 @@ export const CONFIG = {
   },
 
   // === ГЕНЕРАТОР УРОВНЕЙ (значения по умолчанию для dev-панели) ===
+  // Цель: плотные кроссворды на 7-12 слов, центральное слово 5+ букв.
   GENERATOR_DEFAULTS: {
-    letterCount: 5,
-    minWords: 3,
-    maxWords: 5,
+    letterCount: 6,
+    centerWordMinLen: 5,            // длина самого длинного (центрального) слова ≥ этой
+    minWords: 7,
+    maxWords: 12,
     minWordLen: 3,
-    maxWordLen: 5,
+    maxWordLen: 7,
+    maxGridDim: 11,                 // макс. размер сетки в любом измерении (для портрета)
     difficulty: 'normal',           // 'easy' | 'normal' | 'hard'
     maxPlacementAttempts: 200,
-    maxLetterReshuffles: 30
+    maxLetterReshuffles: 80
   },
 
   // === АУДИО ===

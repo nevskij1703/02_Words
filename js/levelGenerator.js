@@ -187,38 +187,56 @@ function compact(grid, placements) {
   return { rows: newRows, cols: newCols, placements: newPlacements };
 }
 
-// Главная функция размещения. На входе — массив слов (нормализованных).
-// Сортируем по убыванию длины, кладём первое в центр, дальше — где пересекается.
-export function placeWords(rawWords) {
-  const words = [...new Set(rawWords.map(normalize))].filter(w => w.length >= 3);
-  if (words.length === 0) return null;
-  words.sort((a, b) => b.length - a.length);
-
-  // Большая «холщовая» сетка; потом скомпактуем.
-  const MAX = 20;
+// Одна попытка раскладки: первое слово (longest) горизонтально по центру,
+// остальные — где пересекается.
+function placeOnce(words) {
+  const MAX = 22;
   const grid = emptyGrid(MAX, MAX);
   const placements = [];
-
-  // Первое слово — горизонтально по центру.
   const first = words[0];
   const r0 = Math.floor(MAX / 2);
   const c0 = Math.floor((MAX - first.length) / 2);
   if (!canPlace(grid, first, r0, c0, 'horizontal', false)) return null;
   placeOnGrid(grid, first, r0, c0, 'horizontal');
   placements.push({ word: first, row: r0, col: c0, direction: 'horizontal' });
-
-  // Остальные.
   for (let i = 1; i < words.length; i++) {
     const word = words[i];
     const opts = findPlacements(grid, word);
-    if (opts.length === 0) continue;            // пропускаем — пересечения нет
-    // Выбираем случайный из вариантов.
+    if (opts.length === 0) continue;
     const opt = opts[Math.floor(Math.random() * opts.length)];
     placeOnGrid(grid, word, opt.row, opt.col, opt.direction);
     placements.push({ word, row: opt.row, col: opt.col, direction: opt.direction });
   }
-
   return compact(grid, placements);
+}
+
+// Главная функция размещения. На входе — массив слов (нормализованных).
+// Делает несколько попыток с перетасовкой хвоста списка, возвращает лучший
+// (наибольшее число размещённых слов) результат.
+export function placeWords(rawWords, opts = {}) {
+  const words = [...new Set(rawWords.map(normalize))].filter(w => w.length >= 3);
+  if (words.length === 0) return null;
+  words.sort((a, b) => b.length - a.length);
+  const TRIES = opts.tries || 30;
+  let best = null;
+  for (let t = 0; t < TRIES; t++) {
+    // На каждой попытке немного перемешиваем хвост (после самого длинного).
+    const trial = [words[0], ...shuffle(words.slice(1))];
+    const layout = placeOnce(trial);
+    if (!layout) continue;
+    if (!best || layout.placements.length > best.placements.length) best = layout;
+    if (best.placements.length === words.length) break;
+  }
+  return best;
+}
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
 
 // === Валидация уровня ===
@@ -301,27 +319,40 @@ export function validateLevel(level) {
 export function generateLevel(opts = {}) {
   const o = { ...CONFIG.GENERATOR_DEFAULTS, ...opts };
   const reshuffles = o.maxLetterReshuffles;
+  const centerMin = o.centerWordMinLen || 5;
   for (let attempt = 0; attempt < reshuffles; attempt++) {
     const letters = pickLetters(o.letterCount);
     const formable = findFormableWords(letters, o.minWordLen, o.maxWordLen);
     if (formable.length < o.minWords) continue;
 
-    // Выбираем основные слова: предпочитаем покрытие разными буквами.
-    // Простой эвристик: shuffle + берём minWords..maxWords.
-    formable.sort(() => Math.random() - 0.5);
-    const numWords = Math.min(o.maxWords, Math.max(o.minWords, Math.floor(o.minWords + Math.random() * (o.maxWords - o.minWords + 1))));
-    const main = formable.slice(0, numWords);
+    // Должно быть хотя бы одно слово длиной ≥ centerMin (центральное).
+    const haveLongEnough = formable.some(w => w.length >= centerMin);
+    if (!haveLongEnough) continue;
+
+    // Сортируем formable по убыванию длины (длинные приоритетнее для пересечений).
+    formable.sort((a, b) => b.length - a.length);
+
+    // Берём кандидатов: до maxWords слов начиная с самого длинного. placeWords
+    // постарается уместить как можно больше, в среднем 60-90% помещаются.
+    const candidates = formable.slice(0, o.maxWords);
 
     // Размещаем.
-    const layout = placeWords(main);
+    const layout = placeWords(candidates, { tries: 40 });
     if (!layout) continue;
-    // Все основные ли разместились?
-    const placedWords = new Set(layout.placements.map(p => p.word));
-    const placedMain = main.filter(w => placedWords.has(w));
-    if (placedMain.length < o.minWords) continue;
 
-    // Если разместились не все запрошенные слова — берём только размещённые как mainWords.
-    const finalMain = placedMain;
+    const placements = layout.placements;
+    // Гарантируем, что самое длинное размещённое слово ≥ centerMin.
+    const longestPlaced = Math.max(...placements.map(p => p.word.length), 0);
+    if (longestPlaced < centerMin) continue;
+
+    // Если разместили слишком мало — пробуем дальше.
+    if (placements.length < o.minWords) continue;
+
+    // Ограничение размеров сетки (для портретного экрана).
+    const maxDim = o.maxGridDim || 11;
+    if (layout.rows > maxDim || layout.cols > maxDim) continue;
+
+    const finalMain = placements.map(p => p.word);
 
     // Бонусы — всё что формируется, но не в основных.
     const bonus = formable.filter(w => !finalMain.includes(w));
