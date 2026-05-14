@@ -7,6 +7,7 @@
 
 import { CONFIG } from './config.js';
 import * as storage from './storage.js';
+import * as cells from './cells.js';
 
 // Подписки, которые установит ui.js — чтобы панель могла дёрнуть «загрузить уровень N»
 // без знания внутренней структуры UI.
@@ -143,6 +144,7 @@ export function showCheatPanel() {
   overlay.querySelector('#ct-reset').addEventListener('click', () => {
     if (!confirm('Точно сбросить весь прогресс?')) return;
     storage.reset();
+    cells.clearAll();
     close();
     hooks.onJumpTo && hooks.onJumpTo(0);
   });

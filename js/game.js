@@ -20,6 +20,7 @@
 import { DICTIONARY, normalize } from './dictionary.js';
 import { canFormWord } from './levels.js';
 import * as storage from './storage.js';
+import * as cells from './cells.js';
 import { CONFIG } from './config.js';
 
 export function createGame({ onEvent = () => {}, crossword = null } = {}) {
@@ -66,13 +67,9 @@ export function createGame({ onEvent = () => {}, crossword = null } = {}) {
     for (const w of saved) foundBonus.add(normalize(w));
 
     // Восстанавливаем ранее открытые ячейки (свайпом или подсказкой).
-    // restoreCell не дёргает onCellReveal — значит, в storage не пишется заново.
-    // Защита от устаревших закэшированных модулей (storage без getRevealedCells
-    // или crossword без restoreCell) — просто пропускаем восстановление, но
-    // не падаем на запуске.
-    if (cw && typeof cw.restoreCell === 'function' &&
-        typeof storage.getRevealedCells === 'function') {
-      const savedCells = storage.getRevealedCells(lv.id) || [];
+    // restoreCell не дёргает onCellReveal — в cells.js не пишется заново.
+    if (cw && typeof cw.restoreCell === 'function') {
+      const savedCells = cells.getCells(lv.id);
       for (const [r, c] of savedCells) cw.restoreCell(r, c);
       // После восстановления — авто-зачёт слов, у которых все ячейки открыты.
       checkAndMarkRevealedWords();
@@ -84,12 +81,9 @@ export function createGame({ onEvent = () => {}, crossword = null } = {}) {
     if (levelCompleteEmitted) return;
     levelCompleteEmitted = true;
     storage.markLevelCompleted(level.id);
-    // Состояние ячеек уровня больше не нужно — освобождаем место в storage
-    // и гарантируем чистый старт при повторном заходе. Guard на случай
-    // устаревшего закэшированного storage.js.
-    if (typeof storage.clearRevealedCells === 'function') {
-      storage.clearRevealedCells(level.id);
-    }
+    // Состояние ячеек уровня больше не нужно — освобождаем место и
+    // гарантируем чистый старт при повторном заходе.
+    cells.clearCells(level.id);
     onEvent({ type: 'level-complete' });
   }
 

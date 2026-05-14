@@ -9,6 +9,7 @@ import * as storage from './storage.js';
 import { CONFIG } from './config.js';
 import { showCheatPanel, attachSecretTap, setHooks as setCheatHooks } from './cheatPanel.js';
 import * as tutorial from './tutorial.js';
+import * as cells from './cells.js';
 
 // Aurora-стилистика: контурные иконки с currentColor + waves-on/off через <g>.
 const ICON_HINT = `
@@ -166,13 +167,9 @@ export async function mountGame(app, allLevels) {
 
     cwApi = crossword.render(level, els.crosswordW, {
       // Каждое открытие ячейки (свайп/подсказка/чит-завершение) пишется
-      // в storage. На рестарте уровень восстанавливается из этих данных.
-      // Guard на случай старого закэшированного storage.js без addRevealedCell.
-      onCellReveal: (r, c) => {
-        if (typeof storage.addRevealedCell === 'function') {
-          storage.addRevealedCell(level.id, r, c);
-        }
-      }
+      // в отдельное хранилище (cells.js). На рестарте уровень
+      // восстанавливается из этих данных.
+      onCellReveal: (r, c) => cells.addCell(level.id, r, c)
     });
     game = createGame({ onEvent: handleGameEvent });
     game.setCrossword(cwApi);

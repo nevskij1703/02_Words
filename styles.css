@@ -242,7 +242,10 @@ button {
   justify-content: center;
   padding: 8px 12px;
   min-height: 0;
-  overflow: hidden;
+  /* overflow: visible — иначе фиолетовая box-shadow открытых ячеек у
+     краёв сетки обрезается. Сама сетка по размеру подгоняется в
+     crossword.render() → fit(), поэтому overflow:hidden больше не нужен. */
+  overflow: visible;
 }
 
 .crossword-grid {
