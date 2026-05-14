@@ -431,16 +431,16 @@ button {
   align-items: center;
   gap: 10px;
   padding: 14px 22px;
-  background: #ffb84d;
-  color: #4a2e00;
+  background: #4a9eff;
+  color: #fff;
   border-radius: 22px;
   font-weight: 700;
   font-size: 16px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.22);
   cursor: pointer;
-  transition: transform 0.1s;
+  transition: transform 0.1s, background 0.2s;
 }
-.hint-banner button:active { transform: scale(0.96); }
+.hint-banner button:active { transform: scale(0.96); background: #3a8def; }
 .hint-banner .hint-banner-icon { font-size: 22px; }
 
 /* === Tutorial overlay === */
