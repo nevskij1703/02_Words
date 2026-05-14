@@ -37,20 +37,42 @@ export function buildCellMap(placements, rows, cols) {
 
 // Рендер сетки в указанный контейнер. Возвращает API для управления.
 export function render(level, container) {
+  // Отключаем предыдущий ResizeObserver, если был.
+  if (container.__crosswordRO) {
+    container.__crosswordRO.disconnect();
+    container.__crosswordRO = null;
+  }
   container.innerHTML = '';
   const { rows, cols } = level.grid;
   const cells = buildCellMap(level.placements, rows, cols);
 
-  // CSS Grid с фиксированным числом колонок. Размер ячейки — auto, ограничим max.
+  // CSS Grid с фиксированным числом колонок. Реальный размер ячейки
+  // считаем в fit() из доступного места — без этого сетка с 10-11 строками
+  // вылазит за вертикальные пределы (top-cut на узком экране).
   const grid = document.createElement('div');
   grid.className = 'crossword-grid';
   grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
 
-  // Ширину ограничиваем меньшим из (доступная ширина, cols × maxCellPx).
-  // Для плотных кроссвордов (11×11) на 350px-телефоне ячейка будет ~30px.
-  const maxCellPx = cols >= 9 ? 40 : 52;
-  grid.style.maxWidth = `${cols * maxCellPx}px`;
-  grid.style.width = '100%';
+  const MAX_CELL = 52;
+  const MIN_CELL = 16;
+  const GAP_PX = 3;
+  const PAD_PX = 16;   // .crossword-wrap padding (8 × 2)
+
+  function fit() {
+    const rect = container.getBoundingClientRect();
+    const availW = Math.max(0, rect.width  - PAD_PX);
+    const availH = Math.max(0, rect.height - PAD_PX);
+    if (availW < 10 || availH < 10) return;
+    const cellByW = (availW - (cols - 1) * GAP_PX) / cols;
+    const cellByH = (availH - (rows - 1) * GAP_PX) / rows;
+    const cell = Math.max(MIN_CELL, Math.min(MAX_CELL, cellByW, cellByH));
+    const totalW = cell * cols + (cols - 1) * GAP_PX;
+    grid.style.width = totalW + 'px';
+    grid.style.maxWidth = totalW + 'px';
+    // Размер шрифта подгоняем под фактический размер ячейки.
+    const fontPx = Math.max(10, Math.min(22, Math.round(cell * 0.55)));
+    grid.style.setProperty('--cell-font', fontPx + 'px');
+  }
 
   // Создаём DOM-ячейки и держим ссылки.
   const cellEls = Array.from({ length: rows }, () => Array(cols).fill(null));
@@ -77,6 +99,17 @@ export function render(level, container) {
   }
 
   container.appendChild(grid);
+
+  // Подгоняем размер ячеек под доступное место и следим за ресайзом.
+  fit();
+  requestAnimationFrame(fit);
+  if (typeof ResizeObserver !== 'undefined') {
+    const ro = new ResizeObserver(fit);
+    ro.observe(container);
+    container.__crosswordRO = ro;
+  } else {
+    window.addEventListener('resize', fit);
+  }
 
   // === API возврата ===
 
