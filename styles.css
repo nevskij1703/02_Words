@@ -80,28 +80,35 @@ body {
   --bg-blob-3: rgba(60, 180, 150, 0.32);
   --bg-blob-4: rgba(220, 120, 80, 0.32);
 
-  --surface-soft:          rgba(255, 255, 255, 0.06);
-  --surface-soft-border:   rgba(255, 255, 255, 0.10);
-  --surface-medium:        rgba(255, 255, 255, 0.10);
-  --surface-strong:        rgba(255, 255, 255, 0.16);
-  --surface-strong-border: rgba(255, 255, 255, 0.24);
+  /* Glass плотнее, чем в первой версии — поля должны читаться. */
+  --surface-soft:          rgba(255, 255, 255, 0.12);
+  --surface-soft-border:   rgba(255, 255, 255, 0.16);
+  --surface-medium:        rgba(255, 255, 255, 0.14);
+  --surface-strong:        rgba(255, 255, 255, 0.22);
+  --surface-strong-border: rgba(255, 255, 255, 0.30);
   --glass-bg:        var(--surface-medium);
-  --glass-bg-strong: rgba(255, 255, 255, 0.14);
-  --glass-border:    rgba(255, 255, 255, 0.14);
+  /* В тёмной теме подложки кнопок = подложка пилюли «Уровень». */
+  --glass-bg-strong: var(--surface-medium);
+  --glass-border:    rgba(255, 255, 255, 0.18);
 
   --card-bg:     rgba(25, 18, 55, 0.85);
   --card-bg-2:   rgba(30, 22, 65, 0.88);
   --card-border: rgba(255, 255, 255, 0.18);
 
-  --wheel-disc-c1: rgba(255, 255, 255, 0.14);
-  --wheel-disc-c2: rgba(255, 255, 255, 0.06);
-  --wheel-disc-c3: rgba(255, 255, 255, 0.03);
-  --wheel-disc-border: rgba(255, 255, 255, 0.16);
+  --wheel-disc-c1: rgba(255, 255, 255, 0.18);
+  --wheel-disc-c2: rgba(255, 255, 255, 0.08);
+  --wheel-disc-c3: rgba(255, 255, 255, 0.04);
+  --wheel-disc-border: rgba(255, 255, 255, 0.20);
 
   --overlay-tint: rgba(15, 8, 35, 0.55);
 
   --glow:        0 8px 24px rgba(0, 0, 0, 0.40);
   --glow-strong: 0 12px 36px rgba(0, 0, 0, 0.55);
+}
+
+/* В тёмной теме иконки на верхних кнопках белые (вместо primary-фиолетового). */
+:root[data-theme="dark"] .icon-btn {
+  color: #fff;
 }
 
 #app {
@@ -200,8 +207,10 @@ button {
   width: 26px;
   height: 26px;
 }
+/* Выключенное состояние (например, звук off) — лёгкая прозрачность,
+   крестик внутри SVG уже отрисовывается группой .wave-off. */
 .icon-btn[data-state="off"] {
-  color: var(--ink-mute);
+  opacity: 0.55;
 }
 
 .icon-btn .badge {
@@ -256,18 +265,22 @@ button {
 .cell.empty { background: transparent; }
 
 .cell.letter {
-  background: var(--surface-soft);
+  /* Закрытое состояние — плотная белая (в light) / светлая (в dark) плашка. */
+  background: var(--surface-strong);
   -webkit-backdrop-filter: blur(8px);
           backdrop-filter: blur(8px);
-  border: 1px solid var(--surface-soft-border);
+  border: 1px solid var(--surface-strong-border);
+  box-shadow: 0 4px 14px rgba(91, 62, 234, 0.08),
+              inset 0 1px 0 var(--surface-strong-border);
 }
 .cell.letter[data-revealed="false"] .letter-face { visibility: hidden; }
 .cell.letter[data-revealed="true"] {
-  background: var(--surface-strong);
-  color: var(--ink);
-  box-shadow: 0 4px 14px rgba(91, 62, 234, 0.10),
-              inset 0 1px 0 var(--surface-strong-border);
-  border-color: var(--surface-strong-border);
+  /* Открытое — primary градиент с белой буквой (как выделенная буква на колесе). */
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 6px 18px rgba(91, 62, 234, 0.38),
+              inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .cell.flip .letter-face {
