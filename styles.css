@@ -207,7 +207,7 @@ button {
 .wheel::before {
   content: '';
   position: absolute;
-  inset: 4%;
+  inset: 14%;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.12);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18),
