@@ -1,96 +1,237 @@
-// ads.js — рекламный менеджер. Сейчас mock-режим, потом подключим Яндекс.
+// ads.js — рекламный менеджер с двумя backend'ами.
 //
-// Контракт:
-//   await ads.showInterstitialAd()       → resolves, когда реклама закрыта
-//   await ads.showRewardedAd()           → { rewarded: true|false }
-//   ads.shouldShowInterstitial(levelIdx) → boolean (частота из CONFIG.ADS.interstitialEveryN)
+// Архитектура (см. docs/ADS.md):
+//   native — html2apk с -YandexAdsBridge экспонирует window.YandexAds.*
+//            и шлёт результаты в window.__yandexAdsCallback(kind, event).
+//   mock   — DOM-оверлей для dev-режима в браузере.
+//
+// Расписание интерстишиалов (CONFIG.ADS):
+//   - не показываем до перехода на CONFIG.ADS.interstitialMinLevel-й уровень
+//     (zero-based). По умолчанию 3 → первая возможность = переход на L4.
+//   - между двумя успешными показами — кулдаун CONFIG.ADS.interstitialCooldownMs
+//     (2 минуты по умолчанию), хранится в памяти (сбрасывается с перезапуском).
+//   - если игрок открыл рекламу и не вернулся (закрыл приложение), а
+//     перезапустился в течение CONFIG.ADS.pendingResumeWindowMs, при первом
+//     же старте уровня форсим показ.
+//
+// Контракт публичного API:
+//   await initAds()                       → детектит backend + читает pending
+//   await showInterstitialAd()            → resolves когда реклама закрыта
+//   await showRewardedAd()                → { rewarded: true|false }
+//   shouldShowInterstitial(levelIndex)    → boolean (минимум-уровень + кулдаун)
+//   hasPendingResumeInterstitial()        → true если в прошлой сессии не
+//                                            досмотрели и прошло мало времени
+//   consumePendingResume()                → снимает флаг (без показа)
+//   getBackend()                          → 'native' | 'mock'
 
 import { CONFIG } from './config.js';
 
-// === Mock-реализации с UI-оверлеями ===
+const PENDING_KEY = '02words_pending_interstitial';
 
-function makeOverlay(text, durationMs, withCountdown = true) {
+let backend = 'mock';
+let pendingInterstitial = null;
+let pendingRewarded = null;
+let lastInterstitialShownAt = 0;   // ms epoch, in-memory only (per session)
+let pendingResumeFlag = false;     // взведён при initAds если нашли свежий pending
+
+function setupNativeCallback() {
+  // Глобальный канал получения событий от Java-стороны.
+  // Java вызывает: window.__yandexAdsCallback(kind, event)
+  //   kind:  'interstitial' | 'rewarded'
+  //   event: 'closed' | 'rewarded'
+  window.__yandexAdsCallback = (kind, event) => {
+    if (kind === 'interstitial' && pendingInterstitial) {
+      const resolve = pendingInterstitial;
+      pendingInterstitial = null;
+      resolve({ shown: true });
+    }
+    if (kind === 'rewarded' && pendingRewarded) {
+      const resolve = pendingRewarded;
+      pendingRewarded = null;
+      resolve({ rewarded: event === 'rewarded' });
+    }
+  };
+}
+
+function preloadInterstitial() {
+  if (backend !== 'native') return;
+  if (!window.YandexAds || typeof window.YandexAds.preloadInterstitial !== 'function') return;
+  try {
+    window.YandexAds.preloadInterstitial(CONFIG.ADS.unitInterstitial);
+  } catch (e) { console.warn('[ads] preload interstitial skipped:', e); }
+}
+
+function preloadRewarded() {
+  if (backend !== 'native') return;
+  if (!window.YandexAds || typeof window.YandexAds.preloadRewarded !== 'function') return;
+  try {
+    window.YandexAds.preloadRewarded(CONFIG.ADS.unitRewarded);
+  } catch (e) { console.warn('[ads] preload rewarded skipped:', e); }
+}
+
+function detectBackend() {
+  if (CONFIG.ADS.useMock) {
+    backend = 'mock';
+    console.log('[ads] backend=mock (forced by CONFIG.ADS.useMock)');
+    return;
+  }
+  if (window.YandexAds && typeof window.YandexAds.showInterstitial === 'function') {
+    backend = 'native';
+    setupNativeCallback();
+    console.log('[ads] backend=native (YandexAds bridge detected)');
+    // Preload первой пары реклам, чтобы первый показ был мгновенным.
+    preloadInterstitial();
+    preloadRewarded();
+    return;
+  }
+  backend = 'mock';
+  console.log('[ads] backend=mock (window.YandexAds not present — dev browser)');
+}
+
+// === Pending-resume utilities (localStorage) ===
+
+function readPendingTs() {
+  try { return parseInt(localStorage.getItem(PENDING_KEY) || '0', 10) || 0; }
+  catch { return 0; }
+}
+function writePendingTs() {
+  try { localStorage.setItem(PENDING_KEY, String(Date.now())); } catch {}
+}
+function clearPendingTs() {
+  try { localStorage.removeItem(PENDING_KEY); } catch {}
+}
+
+// === Mock-реализация с DOM-оверлеем ===
+
+function makeOverlay(text, durationMs) {
   return new Promise(resolve => {
     const overlay = document.createElement('div');
     overlay.className = 'interstitial';
     const card = document.createElement('div');
     card.className = 'mock-ad';
-    card.innerHTML = `<div>🎬 ${text}</div>${withCountdown ? '<div class="countdown">3</div>' : ''}`;
+    card.innerHTML = `<div>🎬 ${text}</div><div class="countdown">3</div>`;
     overlay.appendChild(card);
     document.body.appendChild(overlay);
 
     let remaining = Math.ceil(durationMs / 1000);
     const counter = card.querySelector('.countdown');
-    const interval = withCountdown ? setInterval(() => {
+    const interval = setInterval(() => {
       remaining--;
       if (counter) counter.textContent = String(Math.max(0, remaining));
-    }, 1000) : null;
+    }, 1000);
 
     setTimeout(() => {
-      if (interval) clearInterval(interval);
+      clearInterval(interval);
       overlay.remove();
       resolve();
     }, durationMs);
   });
 }
 
-const mockAds = {
-  async showInterstitialAd() {
-    // TODO(Yandex): заменить на ysdk.adv.showFullscreenAdv({...})
-    await makeOverlay('Реклама (mock)', CONFIG.ADS.mockInterstitialDurationMs);
-    return { shown: true };
-  },
-  async showRewardedAd() {
-    // TODO(Yandex): заменить на ysdk.adv.showRewardedVideo({ callbacks: {...} })
-    await makeOverlay('Просмотр за награду (mock)', CONFIG.ADS.mockRewardedDurationMs);
-    return { rewarded: true };
-  }
-};
-
-// === Яндекс-адаптер (заготовка) ===
-// Когда подключим Yandex Games SDK, реализация будет:
-//   await YaGames.init() → ysdk
-//   ysdk.adv.showFullscreenAdv({ callbacks: { onClose: ... } })
-//   ysdk.adv.showRewardedVideo({ callbacks: { onRewarded: () => rewarded=true, onClose: ... } })
-
-const yandexAds = {
-  ysdk: null,
-  async init() {
-    // TODO(Yandex): подгружать <script src="/sdk.js"> и вызывать YaGames.init()
-    console.warn('[ads] yandex SDK not yet integrated, falling back to mock');
-  },
-  async showInterstitialAd() {
-    return mockAds.showInterstitialAd();
-  },
-  async showRewardedAd() {
-    return mockAds.showRewardedAd();
-  }
-};
-
 // === Публичный API ===
 
-const impl = CONFIG.ADS.useMock ? mockAds : yandexAds;
-
 export async function initAds() {
-  if (!CONFIG.ADS.useMock && yandexAds.init) {
-    await yandexAds.init();
+  detectBackend();
+  // Восстановление: если игрок не досмотрел интерстишиал в прошлой сессии
+  // и перезапустил приложение быстро — форсим показ при первом загрузке уровня.
+  const pendingAt = readPendingTs();
+  const window_ = CONFIG.ADS.pendingResumeWindowMs || 5 * 60 * 1000;
+  if (pendingAt && Date.now() - pendingAt < window_) {
+    pendingResumeFlag = true;
   }
+  // Чистим — pendingResumeFlag уже взведён (если был свежий), будет «использован»
+  // через consumePendingResume() в ui.js.
+  clearPendingTs();
 }
 
-export function showInterstitialAd() {
-  return impl.showInterstitialAd();
+export function hasPendingResumeInterstitial() {
+  return pendingResumeFlag;
+}
+
+export function consumePendingResume() {
+  const v = pendingResumeFlag;
+  pendingResumeFlag = false;
+  return v;
+}
+
+export async function showInterstitialAd() {
+  // Когда реклама началась — пишем штамп в localStorage. Если приложение
+  // умрёт (свернёт игрок), при следующем запуске мы это увидим.
+  writePendingTs();
+  // Триггер от resume больше не нужен — игрок до показа всё-таки дошёл.
+  pendingResumeFlag = false;
+
+  let result = { shown: false };
+  try {
+    if (backend === 'native') {
+      result = await new Promise(resolve => {
+        pendingInterstitial = resolve;
+        try {
+          window.YandexAds.showInterstitial(CONFIG.ADS.unitInterstitial);
+        } catch (err) {
+          console.warn('[ads] native interstitial failed', err);
+          pendingInterstitial = null;
+          resolve({ shown: false });
+        }
+      });
+    } else {
+      await makeOverlay('Реклама (mock)', CONFIG.ADS.mockInterstitialDurationMs);
+      result = { shown: true };
+    }
+  } finally {
+    // Реклама закрыта — снимаем штамп, иначе на следующем запуске была бы
+    // ложная сработка resume-логики.
+    clearPendingTs();
+  }
+
+  // Кулдаун обновляем ТОЛЬКО если игрок реально досмотрел/закрыл рекламу
+  // штатно (вернулся в приложение). Если показ упал с ошибкой — не запоминаем,
+  // следующий старт уровня попытается снова.
+  if (result && result.shown) {
+    lastInterstitialShownAt = Date.now();
+    // Подгружаем следующий заранее.
+    preloadInterstitial();
+  }
+  return result;
 }
 
 export function showRewardedAd() {
-  return impl.showRewardedAd();
+  if (backend === 'native') {
+    return new Promise(resolve => {
+      pendingRewarded = resolve;
+      try {
+        window.YandexAds.showRewarded(CONFIG.ADS.unitRewarded);
+      } catch (err) {
+        console.warn('[ads] native rewarded failed', err);
+        pendingRewarded = null;
+        resolve({ rewarded: false });
+      }
+    }).then(res => {
+      // После показа подгружаем следующую rewarded-рекламу.
+      preloadRewarded();
+      return res;
+    });
+  }
+  return makeOverlay('Просмотр за награду (mock)', CONFIG.ADS.mockRewardedDurationMs)
+    .then(() => ({ rewarded: true }));
 }
 
 export function shouldShowInterstitial(levelIndex) {
-  const every = CONFIG.ADS.interstitialEveryN;
-  if (every <= 0) return false;
-  // levelIndex — индекс уровня, к которому только что переходит игрок.
-  // После завершения первого уровня (L1, переход на idx=1) рекламу не показываем.
-  // Далее — каждые `every` уровней. По умолчанию (every=1) — перед каждым.
-  if (levelIndex < 2) return false;
-  return (levelIndex - 1) % every === 0;
+  // Главный выключатель — interstitialMinLevel < 0 отключает все интерстишиалы.
+  const minLevel = CONFIG.ADS.interstitialMinLevel;
+  if (typeof minLevel !== 'number' || minLevel < 0) return false;
+  // levelIndex — индекс уровня, на который только что переходит игрок.
+  // По умолчанию minLevel=3 → первая возможность показа = переход на L4.
+  if (levelIndex < minLevel) return false;
+  // Кулдаун между двумя успешными показами в одной сессии.
+  const cooldown = CONFIG.ADS.interstitialCooldownMs || 0;
+  if (cooldown > 0 && lastInterstitialShownAt &&
+      Date.now() - lastInterstitialShownAt < cooldown) {
+    return false;
+  }
+  return true;
+}
+
+export function getBackend() {
+  return backend;
 }

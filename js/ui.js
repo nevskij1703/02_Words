@@ -377,6 +377,9 @@ export async function mountGame(app, allLevels) {
         return;
       }
       currentLevelIdx = nextIdx;
+      // Сохраняем индекс СРАЗУ — если приложение умрёт во время показа
+      // рекламы, при перезапуске мы окажемся на правильном уровне.
+      storage.setCurrentLevel(currentLevelIdx);
       if (ads.shouldShowInterstitial(currentLevelIdx)) {
         await ads.showInterstitialAd();
       }
@@ -420,6 +423,15 @@ export async function mountGame(app, allLevels) {
   }
 
   // === Запуск ===
+  // Если игрок в прошлой сессии не досмотрел интерстишиал и быстро вернулся,
+  // показываем его ПЕРЕД первой загрузкой уровня. consumePendingResume()
+  // снимает флаг — повторно само по себе не сработает.
+  if (ads.hasPendingResumeInterstitial && ads.hasPendingResumeInterstitial()) {
+    ads.consumePendingResume();
+    try {
+      await ads.showInterstitialAd();
+    } catch (e) { console.warn('[ui] resume interstitial failed', e); }
+  }
   await loadLevel(currentLevelIdx);
 
   return {
