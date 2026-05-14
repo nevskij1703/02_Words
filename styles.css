@@ -56,48 +56,54 @@ button {
 }
 
 .top-bar .level-info {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
 }
 
 .top-bar .top-buttons {
   display: flex;
-  gap: 8px;
+  gap: 12px;
 }
 
 .icon-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 22px;
   background: rgba(255,255,255,0.15);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 36px;
   color: #fff;
   transition: transform 0.1s, background 0.2s;
 }
 .icon-btn:active { transform: scale(0.92); }
-.icon-btn.icon-svg svg { display: block; }
+.icon-btn.icon-svg svg { display: block; width: 42px; height: 42px; }
 .icon-btn .badge {
   position: absolute;
-  font-size: 11px;
+  top: -6px;
+  right: -6px;
+  font-size: 14px;
+  line-height: 1;
   background: #ffb84d;
   color: #4a2e00;
-  border-radius: 8px;
-  padding: 1px 5px;
-  margin-top: 24px;
-  margin-left: 24px;
+  border-radius: 12px;
+  padding: 4px 8px;
   font-weight: 700;
+  border: 2px solid #3a5a8c;
+  min-width: 24px;
+  text-align: center;
 }
 
 /* === Crossword area === */
 .crossword-wrap {
   flex: 1 1 auto;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  padding: 8px;
+  padding: 8px 8px 8px 8px;
   min-height: 0;
   overflow: hidden;
 }
@@ -405,6 +411,69 @@ button {
 }
 .dev-panel .preview-grid { display: inline-block; padding: 8px; background: #2a3f5f; border-radius: 8px; }
 .dev-panel .preview-grid .cell { color: #fff; width: 30px; }
+
+/* === Hint banner (показывается после 3 ошибок подряд) === */
+.hint-banner {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  padding: 6px 16px 10px;
+  animation: pillIn 0.3s ease;
+}
+.hint-banner button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 22px;
+  background: #ffb84d;
+  color: #4a2e00;
+  border-radius: 22px;
+  font-weight: 700;
+  font-size: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.22);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.hint-banner button:active { transform: scale(0.96); }
+.hint-banner .hint-banner-icon { font-size: 22px; }
+
+/* === Tutorial overlay === */
+.tut-hand {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  margin-left: -22px;
+  margin-top: -22px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  z-index: 5;
+  filter: drop-shadow(0 3px 8px rgba(0,0,0,0.25));
+}
+.tut-hand.visible { opacity: 1; }
+.tut-hand.fade-out { opacity: 0; }
+.tut-hand.pulse svg circle:last-child {
+  animation: tutPulse 0.6s ease-in-out infinite;
+}
+@keyframes tutPulse {
+  0%, 100% { transform-origin: center; transform: scale(1); }
+  50% { transform: scale(1.4); }
+}
+.tut-label {
+  flex: 0 0 auto;
+  text-align: center;
+  padding: 4px 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.85);
+  opacity: 0;
+  transition: opacity 0.25s;
+  min-height: 22px;
+}
+.tut-label.visible { opacity: 1; }
+.tut-label.fade-out { opacity: 0; }
 
 /* === Utility === */
 .hidden { display: none !important; }

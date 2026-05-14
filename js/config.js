@@ -6,6 +6,8 @@ export const CONFIG = {
   BALANCE: {
     startingHints: 5,          // подсказок на старте новой игры
     hintsPerRewardedAd: 3,     // сколько подсказок дать за просмотр rewarded
+    hintsRefillCap: 5,         // после каждого уровня даём +1 подсказку, пока не упрёмся в этот потолок
+    wrongStreakForHintBanner: 3, // через сколько подряд неправильных слов показывать кнопку «Использовать подсказку»
     minLevelDurationMs: 30_000 // ниже — статистика не учитывается (антифрод)
   },
 

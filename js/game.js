@@ -20,6 +20,7 @@
 import { DICTIONARY, normalize } from './dictionary.js';
 import { canFormWord } from './levels.js';
 import * as storage from './storage.js';
+import { CONFIG } from './config.js';
 
 export function createGame({ onEvent = () => {}, crossword = null } = {}) {
   let level = null;
@@ -27,6 +28,24 @@ export function createGame({ onEvent = () => {}, crossword = null } = {}) {
   let foundBonus = new Set();
   let bonusSet = new Set();
   let mainSet = new Set();
+  let wrongStreak = 0;
+  let hintBannerVisible = false;
+
+  function noteWrong() {
+    wrongStreak++;
+    if (!hintBannerVisible && wrongStreak >= CONFIG.BALANCE.wrongStreakForHintBanner) {
+      hintBannerVisible = true;
+      onEvent({ type: 'show-hint-banner' });
+    }
+  }
+
+  function noteValid() {
+    wrongStreak = 0;
+    if (hintBannerVisible) {
+      hintBannerVisible = false;
+      onEvent({ type: 'hide-hint-banner' });
+    }
+  }
 
   let cw = crossword;
 
@@ -36,6 +55,8 @@ export function createGame({ onEvent = () => {}, crossword = null } = {}) {
     foundBonus = new Set();
     mainSet  = new Set(lv.mainWords.map(normalize));
     bonusSet = new Set((lv.bonusWords || []).map(normalize));
+    wrongStreak = 0;
+    hintBannerVisible = false;
 
     // Учитываем уже найденные ранее бонусы из storage (по идее их игрок
     // нашёл при предыдущем заходе на уровень).
@@ -47,10 +68,12 @@ export function createGame({ onEvent = () => {}, crossword = null } = {}) {
     const w = normalize(word);
     if (!level || w.length < 3) {
       onEvent({ type: 'word-invalid', word: w });
+      noteWrong();
       return { kind: 'invalid' };
     }
     if (!canFormWord(w, level.letters.map(normalize))) {
       onEvent({ type: 'word-invalid', word: w });
+      noteWrong();
       return { kind: 'invalid' };
     }
     // Main?
@@ -61,6 +84,7 @@ export function createGame({ onEvent = () => {}, crossword = null } = {}) {
       }
       foundMain.add(w);
       storage.incWordsFound(1);
+      noteValid();
       const placementIdx = level.placements.findIndex(p => normalize(p.word) === w);
       if (cw && placementIdx >= 0) cw.revealPlacement(placementIdx);
       onEvent({ type: 'word-main', word: w, placementIdx });
@@ -79,11 +103,13 @@ export function createGame({ onEvent = () => {}, crossword = null } = {}) {
       foundBonus.add(w);
       storage.recordBonusWord(level.id, w);
       storage.incWordsFound(1);
+      noteValid();
       onEvent({ type: 'word-bonus', word: w });
       return { kind: 'bonus' };
     }
     // Слово есть в словаре, но не подходит этому уровню — тоже invalid.
     onEvent({ type: 'word-invalid', word: w });
+    noteWrong();
     return { kind: 'invalid' };
   }
 
@@ -101,6 +127,8 @@ export function createGame({ onEvent = () => {}, crossword = null } = {}) {
     const cell = cw.revealRandomHiddenCell();
     if (!cell) return false;
     storage.spendHint();
+    // Использование подсказки сбрасывает счётчик ошибок и скрывает баннер.
+    noteValid();
     onEvent({ type: 'hint', cell, hintsLeft: storage.getHints() });
 
     // Если подсказка раскрыла последнюю закрытую ячейку — авто-зачёт

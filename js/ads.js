@@ -88,6 +88,9 @@ export function showRewardedAd() {
 export function shouldShowInterstitial(levelIndex) {
   const every = CONFIG.ADS.interstitialEveryN;
   if (every <= 0) return false;
-  // Показываем перед уровнем `every`, `2*every`, … (т.е. перед каждым N-м, начиная с N).
-  return levelIndex > 0 && levelIndex % every === 0;
+  // levelIndex — индекс уровня, к которому только что переходит игрок.
+  // После завершения первого уровня (L1, переход на idx=1) рекламу не показываем.
+  // Далее — каждые `every` уровней. По умолчанию (every=1) — перед каждым.
+  if (levelIndex < 2) return false;
+  return (levelIndex - 1) % every === 0;
 }

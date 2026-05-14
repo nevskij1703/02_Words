@@ -8,6 +8,7 @@ import * as ads from './ads.js';
 import * as storage from './storage.js';
 import { CONFIG } from './config.js';
 import { showCheatPanel, attachSecretTap, setHooks as setCheatHooks } from './cheatPanel.js';
+import * as tutorial from './tutorial.js';
 
 // Минималистичные SVG-иконки звука. stroke=currentColor → наследуют цвет кнопки.
 const ICON_SOUND_ON = `
@@ -37,6 +38,12 @@ function buildLayout(app) {
     <div class="crossword-wrap" id="crossword-wrap"></div>
     <div class="bonus-row" id="bonus-row"></div>
     <div class="current-word" id="current-word"></div>
+    <div class="hint-banner hidden" id="hint-banner">
+      <button id="btn-hint-banner">
+        <span class="hint-banner-icon">💡</span>
+        <span>Использовать подсказку</span>
+      </button>
+    </div>
     <div class="wheel-area">
       <div class="wheel" id="wheel"></div>
     </div>
@@ -54,8 +61,12 @@ export async function mountGame(app, allLevels) {
     crosswordW: app.querySelector('#crossword-wrap'),
     bonusRow:   app.querySelector('#bonus-row'),
     currentWord:app.querySelector('#current-word'),
+    hintBanner: app.querySelector('#hint-banner'),
+    hintBannerBtn: app.querySelector('#btn-hint-banner'),
     wheelEl:    app.querySelector('#wheel')
   };
+
+  let tutorialControl = null;
 
   let currentLevelIdx = storage.getCurrentLevel();
   if (currentLevelIdx >= allLevels.length) currentLevelIdx = allLevels.length - 1;
@@ -141,6 +152,19 @@ export async function mountGame(app, allLevels) {
     });
     wheel.setLetters(level.letters);
 
+    // Скрыть баннер «Использовать подсказку» при загрузке.
+    hideHintBanner();
+
+    // Тутор только на первом уровне и только если ещё не показан.
+    if (tutorialControl) { tutorialControl.cancel(); tutorialControl = null; }
+    if (idx === 0 && tutorial.shouldRun()) {
+      setTimeout(() => {
+        if (storage.getCurrentLevel() === 0 && tutorial.shouldRun()) {
+          tutorialControl = tutorial.run(els.wheelEl, level.mainWords);
+        }
+      }, 500);
+    }
+
     storage.setCurrentLevel(idx);
   }
 
@@ -149,7 +173,12 @@ export async function mountGame(app, allLevels) {
       case 'word-bonus':
         addBonusPill(ev.word);
         break;
+      case 'word-main':
+        // Если игрок угадал слово сам — гасим тутор (он своё дело сделал).
+        if (tutorialControl) { tutorialControl.cancel(); tutorialControl = null; }
+        break;
       case 'level-complete':
+        refillHintsAfterLevel();
         setTimeout(() => showWinScreen(), 700);
         break;
       case 'hint':
@@ -159,8 +188,53 @@ export async function mountGame(app, allLevels) {
       case 'hint-empty':
         showRewardedAskForHint();
         break;
+      case 'show-hint-banner':
+        showHintBanner();
+        break;
+      case 'hide-hint-banner':
+        hideHintBanner();
+        break;
     }
   }
+
+  // Пополняем подсказки после уровня до потолка (config.BALANCE.hintsRefillCap).
+  function refillHintsAfterLevel() {
+    const cur = storage.getHints();
+    const cap = CONFIG.BALANCE.hintsRefillCap;
+    if (cur < cap) {
+      storage.addHints(1);
+      refreshHintBadge();
+    }
+  }
+
+  // === Баннер «Использовать подсказку» (показывается после 3 ошибок подряд) ===
+
+  function showHintBanner() {
+    els.hintBanner.classList.remove('hidden');
+  }
+
+  function hideHintBanner() {
+    els.hintBanner.classList.add('hidden');
+  }
+
+  els.hintBannerBtn.addEventListener('click', async () => {
+    audio.play('click');
+    hideHintBanner();
+    if (!game) return;
+    const hints = storage.getHints();
+    if (hints > 0) {
+      game.useHint();
+      return;
+    }
+    // Подсказок нет — сразу запускаем rewarded-рекламу.
+    const res = await ads.showRewardedAd();
+    if (res?.rewarded) {
+      storage.addHints(CONFIG.BALANCE.hintsPerRewardedAd);
+      refreshHintBadge();
+      // И сразу же используем одну для открытия буквы.
+      game.useHint();
+    }
+  });
 
   // === Кнопки ===
   els.hintBtn.addEventListener('click', () => {
