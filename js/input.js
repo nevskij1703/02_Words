@@ -41,7 +41,7 @@ export function createLetterWheel(container, callbacks = {}) {
     const rect = container.getBoundingClientRect();
     const cx = rect.width / 2;
     const cy = rect.height / 2;
-    const radius = Math.min(rect.width, rect.height) * 0.24;
+    const radius = Math.min(rect.width, rect.height) * 0.16;
     positions = [];
     const n = letters.length;
     for (let i = 0; i < n; i++) {
@@ -107,13 +107,20 @@ export function createLetterWheel(container, callbacks = {}) {
   }
 
   // Найти ближайшую букву под точкой (x, y в координатах контейнера).
+  // При плотной раскладке хит-зоны могут пересекаться — выбираем минимум.
   function pickLetter(x, y) {
+    let best = -1;
+    let bestD2 = HIT_RADIUS_PX * HIT_RADIUS_PX;
     for (let i = 0; i < positions.length; i++) {
       const dx = x - positions[i].x;
       const dy = y - positions[i].y;
-      if (dx * dx + dy * dy <= HIT_RADIUS_PX * HIT_RADIUS_PX) return i;
+      const d2 = dx * dx + dy * dy;
+      if (d2 <= bestD2) {
+        best = i;
+        bestD2 = d2;
+      }
     }
-    return -1;
+    return best;
   }
 
   function pointerToContainerCoords(ev) {
