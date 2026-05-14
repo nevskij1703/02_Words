@@ -9,6 +9,21 @@ import * as storage from './storage.js';
 import { CONFIG } from './config.js';
 import { showCheatPanel, attachSecretTap, setHooks as setCheatHooks } from './cheatPanel.js';
 
+// Минималистичные SVG-иконки звука. stroke=currentColor → наследуют цвет кнопки.
+const ICON_SOUND_ON = `
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M11 5 L6 9 H3 V15 H6 L11 19 Z"/>
+  <path d="M15.5 8.8 a3.6 3.6 0 0 1 0 6.4"/>
+  <path d="M18.6 5.6 a7.6 7.6 0 0 1 0 12.8"/>
+</svg>`.trim();
+
+const ICON_SOUND_OFF = `
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M11 5 L6 9 H3 V15 H6 L11 19 Z"/>
+  <line x1="16.5" y1="9.5" x2="21.5" y2="14.5"/>
+  <line x1="21.5" y1="9.5" x2="16.5" y2="14.5"/>
+</svg>`.trim();
+
 // === Сборка статической разметки ===
 function buildLayout(app) {
   app.innerHTML = `
@@ -16,7 +31,7 @@ function buildLayout(app) {
       <div class="level-info" id="level-info">Уровень 1</div>
       <div class="top-buttons">
         <button class="icon-btn" id="btn-hint" title="Подсказка">💡<span class="badge" id="hint-count">0</span></button>
-        <button class="icon-btn" id="btn-sound" title="Звук">🔊</button>
+        <button class="icon-btn icon-svg" id="btn-sound" title="Звук">${ICON_SOUND_ON}</button>
       </div>
     </div>
     <div class="crossword-wrap" id="crossword-wrap"></div>
@@ -56,7 +71,7 @@ export async function mountGame(app, allLevels) {
   }
 
   function refreshSoundIcon() {
-    els.soundBtn.textContent = audio.isEnabled() ? '🔊' : '🔇';
+    els.soundBtn.innerHTML = audio.isEnabled() ? ICON_SOUND_ON : ICON_SOUND_OFF;
   }
 
   function clearBonusRow() {
