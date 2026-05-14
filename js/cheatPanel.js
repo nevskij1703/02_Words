@@ -51,6 +51,11 @@ export function showCheatPanel() {
       </div>
 
       <div style="border-top:1px solid #eee;padding-top:10px;margin-bottom:10px">
+        <label style="font-size:12px;color:#666">Подсказок ровно</label>
+        <div style="display:flex;gap:6px;margin:4px 0 6px">
+          <input id="ct-hint-input" type="number" min="0" max="999" value="${storage.getHints()}" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px">
+          <button id="ct-set-hints" style="padding:8px 14px;border-radius:6px;background:#2a8c52;color:#fff;font-weight:600">Set</button>
+        </div>
         <div style="display:flex;gap:6px;margin-bottom:6px">
           <button id="ct-add-hints" style="flex:1;padding:8px;border-radius:6px;background:#2a8c52;color:#fff;font-weight:600">+10 подсказок</button>
           <button id="ct-99-hints" style="flex:1;padding:8px;border-radius:6px;background:#2a8c52;color:#fff;font-weight:600">Подсказок = 99</button>
@@ -106,15 +111,25 @@ export function showCheatPanel() {
     hooks.onCompleteLevel && hooks.onCompleteLevel();
   });
 
+  overlay.querySelector('#ct-set-hints').addEventListener('click', () => {
+    const v = parseInt(overlay.querySelector('#ct-hint-input').value, 10);
+    if (Number.isNaN(v) || v < 0) { alert('Введите число ≥ 0.'); return; }
+    const cur = storage.getHints();
+    storage.addHints(v - cur);
+    refresh();
+  });
+
   overlay.querySelector('#ct-add-hints').addEventListener('click', () => {
     storage.addHints(10);
     refresh();
+    overlay.querySelector('#ct-hint-input').value = storage.getHints();
   });
 
   overlay.querySelector('#ct-99-hints').addEventListener('click', () => {
     const cur = storage.getHints();
     storage.addHints(Math.max(0, 99 - cur));
     refresh();
+    overlay.querySelector('#ct-hint-input').value = storage.getHints();
   });
 
   overlay.querySelector('#ct-mock-ads').addEventListener('change', (ev) => {

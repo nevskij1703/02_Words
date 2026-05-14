@@ -197,6 +197,9 @@ export async function mountGame(app, allLevels) {
     }
   }
 
+  // Сколько подсказок пополнено последним уровнем — для отображения на экране победы.
+  let lastRefillDelta = 0;
+
   // Пополняем подсказки после уровня до потолка (config.BALANCE.hintsRefillCap).
   function refillHintsAfterLevel() {
     const cur = storage.getHints();
@@ -204,6 +207,9 @@ export async function mountGame(app, allLevels) {
     if (cur < cap) {
       storage.addHints(1);
       refreshHintBadge();
+      lastRefillDelta = 1;
+    } else {
+      lastRefillDelta = 0;
     }
   }
 
@@ -276,19 +282,15 @@ export async function mountGame(app, allLevels) {
 
   // === Экран победы ===
   function showWinScreen() {
-    const lvl = game.getLevel();
-    const main = game.getFoundMain();
-    const bonus = game.getFoundBonus();
     const overlay = document.createElement('div');
     overlay.className = 'win-screen';
+    const rewardHtml = lastRefillDelta > 0
+      ? `<div class="stats">Награда: <b>+${lastRefillDelta}</b> <span class="reward-icon">💡</span></div>`
+      : `<div class="stats" style="color:#888">Подсказки уже на максимуме</div>`;
     overlay.innerHTML = `
       <div class="win-card">
         <h2>Уровень пройден!</h2>
-        <div class="stats">
-          Слов кроссворда: <b>${main.length}</b><br>
-          Бонусных слов: <b>${bonus.length}</b>
-          ${bonus.length ? `<br><small style="color:#888">${bonus.slice(0, 10).join(', ')}${bonus.length > 10 ? '…' : ''}</small>` : ''}
-        </div>
+        ${rewardHtml}
         <button class="next-btn" id="win-next">Дальше</button>
       </div>`;
     document.body.appendChild(overlay);
