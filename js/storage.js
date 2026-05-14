@@ -9,9 +9,10 @@ const SCHEMA_VERSION = 1;
 const DEFAULT_STATE = () => ({
   version: SCHEMA_VERSION,
   currentLevel: 0,
-  completedLevels: [],         // [levelId, ...]
+  completedLevels: [],          // [levelId, ...]
   hints: CONFIG.BALANCE.startingHints,
-  foundBonusByLevel: {},       // { [levelId]: ['СЛОВО', ...] }
+  foundBonusByLevel: {},        // { [levelId]: ['СЛОВО', ...] }
+  revealedCellsByLevel: {},     // { [levelId]: [[row, col], ...] } — состояние текущего уровня
   stats: { levelsCompleted: 0, wordsFound: 0 },
   settings: { sound: CONFIG.AUDIO.defaultEnabled, vibration: CONFIG.HAPTIC.defaultEnabled }
 });
@@ -102,6 +103,29 @@ export function recordBonusWord(levelId, word) {
 
 export function getFoundBonus(levelId) {
   return load().foundBonusByLevel[levelId] || [];
+}
+
+// === Открытые ячейки на текущем уровне ===
+// Хранятся пока уровень не завершён. На level-complete очищаются (см. game.js).
+
+export function getRevealedCells(levelId) {
+  const arr = load().revealedCellsByLevel[levelId];
+  return Array.isArray(arr) ? arr : [];
+}
+
+export function addRevealedCell(levelId, row, col) {
+  update(s => {
+    if (!s.revealedCellsByLevel[levelId]) s.revealedCellsByLevel[levelId] = [];
+    const list = s.revealedCellsByLevel[levelId];
+    // Не дублируем — клетка либо открыта, либо нет.
+    if (!list.some(c => c[0] === row && c[1] === col)) {
+      list.push([row, col]);
+    }
+  });
+}
+
+export function clearRevealedCells(levelId) {
+  update(s => { delete s.revealedCellsByLevel[levelId]; });
 }
 
 export function incWordsFound(n = 1) {

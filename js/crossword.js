@@ -36,7 +36,12 @@ export function buildCellMap(placements, rows, cols) {
 }
 
 // Рендер сетки в указанный контейнер. Возвращает API для управления.
-export function render(level, container) {
+// opts:
+//   onCellReveal(r, c) — колбэк после раскрытия конкретной ячейки
+//                        (вызывается на ВСЕ источники: свайп, подсказка, форс).
+//                        Не вызывается при restoreCell (тихое восстановление).
+export function render(level, container, opts = {}) {
+  const onCellReveal = typeof opts.onCellReveal === 'function' ? opts.onCellReveal : null;
   // Отключаем предыдущий ResizeObserver, если был.
   if (container.__crosswordRO) {
     container.__crosswordRO.disconnect();
@@ -122,10 +127,22 @@ export function render(level, container) {
       el.dataset.revealed = 'true';
       el.classList.add('flip');
       el.addEventListener('animationend', () => el.classList.remove('flip'), { once: true });
+      if (onCellReveal) onCellReveal(r, c);
     };
     // Для delayMs=0 — синхронно, чтобы isAllRevealed() сразу видел изменение.
     if (delayMs > 0) setTimeout(apply, delayMs);
     else apply();
+    return true;
+  }
+
+  // Тихое восстановление ячейки (без анимации и без onCellReveal):
+  // используется при загрузке уровня из storage, чтобы вернуть ранее открытые буквы.
+  function restoreCell(r, c) {
+    const data = cells[r][c];
+    const el = cellEls[r] && cellEls[r][c];
+    if (!data || !el || data.revealed) return false;
+    data.revealed = true;
+    el.dataset.revealed = 'true';
     return true;
   }
 
@@ -180,6 +197,7 @@ export function render(level, container) {
 
   return {
     revealCell,
+    restoreCell,
     revealPlacement,
     revealRandomHiddenCell,
     isAllRevealed,
