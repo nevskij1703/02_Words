@@ -174,8 +174,9 @@ export async function mountGame(app, allLevels) {
         addBonusPill(ev.word);
         break;
       case 'word-main':
-        // Если игрок угадал слово сам — гасим тутор (он своё дело сделал).
-        if (tutorialControl) { tutorialControl.cancel(); tutorialControl = null; }
+        // Сообщаем тутору, что игрок нашёл слово — тутор решит, продвинуться
+        // ли на следующее, или продолжить демо текущего.
+        if (tutorialControl) tutorialControl.notifyWordFound(ev.word);
         break;
       case 'level-complete':
         refillHintsAfterLevel();

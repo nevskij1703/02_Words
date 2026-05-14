@@ -48,13 +48,17 @@ const HAND_SVG = `
 
 export function run(wheelEl, mainWords) {
   // Берём 3 самых коротких слова — удобнее для первого опыта.
-  const words = [...mainWords].sort((a, b) => a.length - b.length).slice(0, 3);
+  const words = [...mainWords].sort((a, b) => a.length - b.length).slice(0, 3).map(w => w.toUpperCase());
   if (words.length === 0) {
     markDone();
-    return { cancel() {} };
+    return { cancel() {}, notifyWordFound() {} };
   }
 
   let cancelled = false;
+  let cancelCurrent = false;        // прерывание текущей итерации demoWord
+  let currentIdx = 0;               // индекс активного туторного слова
+  const foundWords = new Set();     // какие туторные слова игрок уже ввёл
+
   const hand = document.createElement('div');
   hand.className = 'tut-hand';
   hand.innerHTML = HAND_SVG;
@@ -124,7 +128,7 @@ export function run(wheelEl, mainWords) {
     clearTrail();
     // Подвести руку к первой букве без транзишена.
     const p0 = getLetterPos(word[0]);
-    if (!p0) return;
+    if (!p0) { label.classList.remove('visible'); return; }
     setHandPos(p0.x, p0.y, false);
     visitedPts.push({ x: p0.x, y: p0.y });
     refreshTrail();
@@ -132,7 +136,7 @@ export function run(wheelEl, mainWords) {
     hand.classList.add('pulse');
     await wait(700);
     for (let i = 1; i < word.length; i++) {
-      if (cancelled) return;
+      if (cancelled || cancelCurrent) break;
       const p = getLetterPos(word[i]);
       if (!p) continue;
       hand.classList.remove('pulse');
@@ -141,10 +145,11 @@ export function run(wheelEl, mainWords) {
       refreshTrail();
       setHandPos(p.x, p.y, true);
       await wait(520);
+      if (cancelled || cancelCurrent) break;
       hand.classList.add('pulse');
       await wait(180);
     }
-    await wait(600);
+    if (!cancelled && !cancelCurrent) await wait(600);
     hand.classList.remove('pulse', 'visible');
     label.classList.remove('visible');
     // Аккуратно гасим линию: уменьшаем opacity, потом стираем.
@@ -156,11 +161,19 @@ export function run(wheelEl, mainWords) {
   }
 
   async function play() {
-    // Небольшая пауза, чтобы игрок успел осознать сцену.
     await wait(800);
-    for (const w of words) {
-      if (cancelled) return;
-      await demoWord(w);
+    while (!cancelled) {
+      cancelCurrent = false;
+      // Перематываем currentIdx через уже найденные туторные слова.
+      while (currentIdx < words.length && foundWords.has(words[currentIdx])) {
+        currentIdx++;
+      }
+      if (currentIdx >= words.length) break;
+      await demoWord(words[currentIdx]);
+      if (cancelled) break;
+      // Если демо не было прервано (игрок ещё не нашёл слово),
+      // делаем паузу и повторяем то же самое слово.
+      if (!cancelCurrent) await wait(900);
     }
     finish();
   }
@@ -184,6 +197,21 @@ export function run(wheelEl, mainWords) {
   play();
 
   return {
-    cancel: finish
+    cancel: finish,
+    // ui.js дёргает это при word-main событии (игрок угадал слово).
+    // Если это туторное слово — продвигаем индекс и прерываем текущее демо;
+    // если просто main-слово вне тутор-набора — запоминаем, но демо
+    // продолжает идти на том же слове.
+    notifyWordFound(word) {
+      if (cancelled) return;
+      const w = (word || '').toUpperCase();
+      foundWords.add(w);
+      // Прерываем текущее демо, только если это слово сейчас демонстрируется.
+      // Слова, найденные «вне очереди», запоминаем в foundWords и пропустим
+      // их, когда они станут текущей целью.
+      if (currentIdx < words.length && words[currentIdx] === w) {
+        cancelCurrent = true;
+      }
+    }
   };
 }
