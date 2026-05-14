@@ -10,17 +10,17 @@ html, body {
   -webkit-user-select: none;
   user-select: none;
   font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif;
-  color: #1d1f3a;
+  color: var(--ink);
   touch-action: manipulation;
 }
 
 body {
   background:
-    radial-gradient(60% 50% at 20% 12%, #ffd6e0 0%, transparent 60%),
-    radial-gradient(50% 50% at 90% 22%, #cfe4ff 0%, transparent 60%),
-    radial-gradient(55% 45% at 8%  78%, #d9f3df 0%, transparent 60%),
-    radial-gradient(60% 55% at 95% 95%, #ffe8c8 0%, transparent 60%),
-    linear-gradient(180deg, #fbf1f8 0%, #eef3fb 100%);
+    radial-gradient(60% 50% at 20% 12%, var(--bg-blob-1) 0%, transparent 60%),
+    radial-gradient(50% 50% at 90% 22%, var(--bg-blob-2) 0%, transparent 60%),
+    radial-gradient(55% 45% at 8%  78%, var(--bg-blob-3) 0%, transparent 60%),
+    radial-gradient(60% 55% at 95% 95%, var(--bg-blob-4) 0%, transparent 60%),
+    linear-gradient(180deg, var(--bg-base-1) 0%, var(--bg-base-2) 100%);
   background-attachment: fixed;
 }
 
@@ -30,11 +30,78 @@ body {
   --ink-mute:   rgba(29, 31, 58, 0.35);
   --primary:    #5b3eea;
   --primary-2:  #e35aa3;
-  --glass-bg:        rgba(255, 255, 255, 0.55);
+
+  /* Background — pastel aurora */
+  --bg-base-1: #fbf1f8;
+  --bg-base-2: #eef3fb;
+  --bg-blob-1: #ffd6e0;
+  --bg-blob-2: #cfe4ff;
+  --bg-blob-3: #d9f3df;
+  --bg-blob-4: #ffe8c8;
+
+  /* Translucent surfaces (glass) — 3 уровня прозрачности */
+  --surface-soft:          rgba(255, 255, 255, 0.32);
+  --surface-soft-border:   rgba(255, 255, 255, 0.55);
+  --surface-medium:        rgba(255, 255, 255, 0.55);
+  --surface-strong:        rgba(255, 255, 255, 0.78);
+  --surface-strong-border: rgba(255, 255, 255, 0.9);
+  --glass-bg:        var(--surface-medium);
   --glass-bg-strong: rgba(255, 255, 255, 0.72);
   --glass-border:    rgba(255, 255, 255, 0.75);
+
+  /* Card / modal glass (более плотные) */
+  --card-bg:     rgba(255, 255, 255, 0.78);
+  --card-bg-2:   rgba(255, 255, 255, 0.85);
+  --card-border: rgba(255, 255, 255, 0.9);
+
+  /* Стеклянный диск под колесом букв */
+  --wheel-disc-c1: rgba(255, 255, 255, 0.75);
+  --wheel-disc-c2: rgba(255, 255, 255, 0.35);
+  --wheel-disc-c3: rgba(255, 255, 255, 0.2);
+  --wheel-disc-border: rgba(255, 255, 255, 0.7);
+
+  /* Overlay-вуаль модалок (за карточкой) */
+  --overlay-tint: rgba(91, 62, 234, 0.25);
+
   --glow:        0 8px 24px rgba(91, 62, 234, 0.12);
   --glow-strong: 0 12px 36px rgba(91, 62, 234, 0.22);
+}
+
+/* ===== Dark theme — Aurora Night ===== */
+:root[data-theme="dark"] {
+  --ink:      #f5f3ff;
+  --ink-soft: rgba(245, 243, 255, 0.7);
+  --ink-mute: rgba(245, 243, 255, 0.4);
+
+  --bg-base-1: #15102e;
+  --bg-base-2: #0a0820;
+  --bg-blob-1: rgba(170, 80, 200, 0.45);
+  --bg-blob-2: rgba(70, 120, 210, 0.45);
+  --bg-blob-3: rgba(60, 180, 150, 0.32);
+  --bg-blob-4: rgba(220, 120, 80, 0.32);
+
+  --surface-soft:          rgba(255, 255, 255, 0.06);
+  --surface-soft-border:   rgba(255, 255, 255, 0.10);
+  --surface-medium:        rgba(255, 255, 255, 0.10);
+  --surface-strong:        rgba(255, 255, 255, 0.16);
+  --surface-strong-border: rgba(255, 255, 255, 0.24);
+  --glass-bg:        var(--surface-medium);
+  --glass-bg-strong: rgba(255, 255, 255, 0.14);
+  --glass-border:    rgba(255, 255, 255, 0.14);
+
+  --card-bg:     rgba(25, 18, 55, 0.85);
+  --card-bg-2:   rgba(30, 22, 65, 0.88);
+  --card-border: rgba(255, 255, 255, 0.18);
+
+  --wheel-disc-c1: rgba(255, 255, 255, 0.14);
+  --wheel-disc-c2: rgba(255, 255, 255, 0.06);
+  --wheel-disc-c3: rgba(255, 255, 255, 0.03);
+  --wheel-disc-border: rgba(255, 255, 255, 0.16);
+
+  --overlay-tint: rgba(15, 8, 35, 0.55);
+
+  --glow:        0 8px 24px rgba(0, 0, 0, 0.40);
+  --glow-strong: 0 12px 36px rgba(0, 0, 0, 0.55);
 }
 
 #app {
@@ -200,18 +267,18 @@ button {
 .cell.empty { background: transparent; }
 
 .cell.letter {
-  background: rgba(255, 255, 255, 0.32);
+  background: var(--surface-soft);
   -webkit-backdrop-filter: blur(8px);
           backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--surface-soft-border);
 }
 .cell.letter[data-revealed="false"] .letter-face { visibility: hidden; }
 .cell.letter[data-revealed="true"] {
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--surface-strong);
   color: var(--ink);
   box-shadow: 0 4px 14px rgba(91, 62, 234, 0.10),
-              inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  border-color: rgba(255, 255, 255, 0.95);
+              inset 0 1px 0 var(--surface-strong-border);
+  border-color: var(--surface-strong-border);
 }
 
 .cell.flip .letter-face {
@@ -234,10 +301,10 @@ button {
   min-height: 30px;
 }
 .bonus-pill {
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--surface-medium);
   -webkit-backdrop-filter: blur(8px);
           backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.75);
+  border: 1px solid var(--glass-border);
   color: var(--primary);
   border-radius: 999px;
   padding: 4px 11px;
@@ -246,6 +313,10 @@ button {
   letter-spacing: 0.2px;
   box-shadow: 0 2px 8px rgba(91, 62, 234, 0.08);
   animation: pillIn 0.3s ease;
+}
+:root[data-theme="dark"] .bonus-pill {
+  /* На тёмном primary тускнеет — даём чуть светлее. */
+  color: #c9b4ff;
 }
 .bonus-pill::before { content: "✦ "; opacity: 0.7; }
 
@@ -313,13 +384,13 @@ button {
   inset: 12%;
   border-radius: 50%;
   background: radial-gradient(circle at 50% 35%,
-    rgba(255, 255, 255, 0.75) 0%,
-    rgba(255, 255, 255, 0.35) 60%,
-    rgba(255, 255, 255, 0.2) 100%);
+    var(--wheel-disc-c1) 0%,
+    var(--wheel-disc-c2) 60%,
+    var(--wheel-disc-c3) 100%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
           backdrop-filter: blur(14px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9),
+  border: 1px solid var(--wheel-disc-border);
+  box-shadow: inset 0 1px 0 var(--surface-strong-border),
               0 16px 40px rgba(91, 62, 234, 0.14);
   pointer-events: none;
 }
@@ -337,7 +408,7 @@ button {
   width: 58px;
   height: 58px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--surface-strong);
   -webkit-backdrop-filter: blur(10px);
           backdrop-filter: blur(10px);
   color: var(--ink);
@@ -346,9 +417,9 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--surface-strong-border);
   box-shadow: 0 6px 16px rgba(91, 62, 234, 0.14),
-              inset 0 1px 0 rgba(255, 255, 255, 0.95);
+              inset 0 1px 0 var(--surface-strong-border);
   transform: translate(-50%, -50%);
   transition: transform 0.15s, background 0.15s, color 0.15s, box-shadow 0.15s;
   pointer-events: auto;
@@ -378,7 +449,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(91, 62, 234, 0.25);
+  background: var(--overlay-tint);
   -webkit-backdrop-filter: blur(20px);
           backdrop-filter: blur(20px);
   z-index: 100;
@@ -386,10 +457,10 @@ button {
 }
 
 .win-card {
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--card-bg);
   -webkit-backdrop-filter: blur(20px) saturate(140%);
           backdrop-filter: blur(20px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--card-border);
   color: var(--ink);
   border-radius: 22px;
   padding: 32px 28px;
@@ -439,7 +510,7 @@ button {
 .interstitial {
   position: absolute;
   inset: 0;
-  background: rgba(91, 62, 234, 0.35);
+  background: var(--overlay-tint);
   -webkit-backdrop-filter: blur(18px);
           backdrop-filter: blur(18px);
   color: var(--ink);
@@ -452,10 +523,10 @@ button {
   gap: 14px;
 }
 .interstitial .mock-ad {
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--card-bg-2);
   -webkit-backdrop-filter: blur(18px);
           backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--card-border);
   border-radius: 18px;
   padding: 40px 30px;
   text-align: center;
@@ -476,7 +547,7 @@ button {
 .dialog {
   position: absolute;
   inset: 0;
-  background: rgba(91, 62, 234, 0.25);
+  background: var(--overlay-tint);
   -webkit-backdrop-filter: blur(14px);
           backdrop-filter: blur(14px);
   display: flex;
@@ -485,10 +556,10 @@ button {
   z-index: 150;
 }
 .dialog-card {
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--card-bg-2);
   -webkit-backdrop-filter: blur(20px) saturate(140%);
           backdrop-filter: blur(20px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--card-border);
   color: var(--ink);
   border-radius: 18px;
   padding: 24px;

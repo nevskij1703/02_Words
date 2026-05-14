@@ -11,6 +11,23 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <script>
+    // Pre-paint theme bootstrap — без него в dark-режиме мелькает светлый фон
+    // на ~100 мс до загрузки ui.js. Читаем сохранённое значение синхронно
+    // прямо до парсинга <body>.
+    (function () {
+      try {
+        var raw = localStorage.getItem('02words_save');
+        if (!raw) return;
+        var s = JSON.parse(raw);
+        if (s && s.settings && s.settings.theme === 'dark') {
+          document.documentElement.dataset.theme = 'dark';
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.setAttribute('content', '#0a0820');
+        }
+      } catch (e) { /* ignore */ }
+    })();
+  </script>
 </head>
 <body>
   <div id="app">

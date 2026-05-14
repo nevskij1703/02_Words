@@ -30,6 +30,19 @@ const ICON_SOUND = `
   </g>
 </svg>`.trim();
 
+// Иконка темы: солнце (показывается при light), луна (при dark).
+// Принцип «показываем текущее состояние» — глядя на иконку понятно какой режим включён.
+const ICON_THEME = `
+<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+  <g class="theme-sun">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.8" fill="currentColor" fill-opacity="0.18"/>
+    <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4l1.4-1.4M17 7l1.4-1.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
+  <g class="theme-moon" style="display:none;">
+    <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" fill="currentColor" fill-opacity="0.18"/>
+  </g>
+</svg>`.trim();
+
 // === Сборка статической разметки ===
 function buildLayout(app) {
   app.innerHTML = `
@@ -40,6 +53,7 @@ function buildLayout(app) {
       <div class="top-buttons">
         <button class="icon-btn icon-svg" id="btn-hint" title="Подсказка" aria-label="Подсказка">${ICON_HINT}<span class="badge" id="hint-count">0</span></button>
         <button class="icon-btn icon-svg" id="btn-sound" title="Звук" aria-label="Звук" data-state="on">${ICON_SOUND}</button>
+        <button class="icon-btn icon-svg" id="btn-theme" title="Тема" aria-label="Тема" data-state="light">${ICON_THEME}</button>
       </div>
     </div>
     <div class="crossword-wrap" id="crossword-wrap"></div>
@@ -65,6 +79,7 @@ export async function mountGame(app, allLevels) {
     hintBtn:    app.querySelector('#btn-hint'),
     hintCount:  app.querySelector('#hint-count'),
     soundBtn:   app.querySelector('#btn-sound'),
+    themeBtn:   app.querySelector('#btn-theme'),
     levelNum:   app.querySelector('#level-num'),
     crosswordW: app.querySelector('#crossword-wrap'),
     bonusRow:   app.querySelector('#bonus-row'),
@@ -96,6 +111,33 @@ export async function mountGame(app, allLevels) {
     const waveOff = els.soundBtn.querySelector('.wave-off');
     if (waveOn)  waveOn.style.display  = on ? '' : 'none';
     if (waveOff) waveOff.style.display = on ? 'none' : '';
+  }
+
+  function currentTheme() {
+    const s = storage.getSettings();
+    return s.theme === 'dark' ? 'dark' : 'light';
+  }
+
+  function applyTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+    // На мобиле обновляем системный theme-color, чтобы статус-бар тоже
+    // подстроился под фон страницы.
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', theme === 'dark' ? '#0a0820' : '#f4ecf7');
+    if (els.themeBtn) {
+      els.themeBtn.dataset.state = theme;
+      const sun  = els.themeBtn.querySelector('.theme-sun');
+      const moon = els.themeBtn.querySelector('.theme-moon');
+      // Показываем иконку ТЕКУЩЕГО состояния.
+      if (sun)  sun.style.display  = theme === 'light' ? '' : 'none';
+      if (moon) moon.style.display = theme === 'dark'  ? '' : 'none';
+    }
+  }
+
+  function toggleTheme() {
+    const next = currentTheme() === 'dark' ? 'light' : 'dark';
+    storage.setSetting('theme', next);
+    applyTheme(next);
   }
 
   function clearBonusRow() {
@@ -267,6 +309,14 @@ export async function mountGame(app, allLevels) {
     if (on) audio.play('click');
     refreshSoundIcon();
   });
+
+  els.themeBtn.addEventListener('click', () => {
+    audio.play('click');
+    toggleTheme();
+  });
+
+  // Применяем сохранённую тему сразу при монтировании.
+  applyTheme(currentTheme());
 
   // === Диалог: подсказки кончились, посмотреть рекламу? ===
   function showRewardedAskForHint() {
