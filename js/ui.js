@@ -167,7 +167,12 @@ export async function mountGame(app, allLevels) {
     cwApi = crossword.render(level, els.crosswordW, {
       // Каждое открытие ячейки (свайп/подсказка/чит-завершение) пишется
       // в storage. На рестарте уровень восстанавливается из этих данных.
-      onCellReveal: (r, c) => storage.addRevealedCell(level.id, r, c)
+      // Guard на случай старого закэшированного storage.js без addRevealedCell.
+      onCellReveal: (r, c) => {
+        if (typeof storage.addRevealedCell === 'function') {
+          storage.addRevealedCell(level.id, r, c);
+        }
+      }
     });
     game = createGame({ onEvent: handleGameEvent });
     game.setCrossword(cwApi);

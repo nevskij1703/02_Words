@@ -67,13 +67,14 @@ export function createGame({ onEvent = () => {}, crossword = null } = {}) {
 
     // Восстанавливаем ранее открытые ячейки (свайпом или подсказкой).
     // restoreCell не дёргает onCellReveal — значит, в storage не пишется заново.
-    if (cw && typeof cw.restoreCell === 'function') {
-      const savedCells = storage.getRevealedCells(lv.id);
+    // Защита от устаревших закэшированных модулей (storage без getRevealedCells
+    // или crossword без restoreCell) — просто пропускаем восстановление, но
+    // не падаем на запуске.
+    if (cw && typeof cw.restoreCell === 'function' &&
+        typeof storage.getRevealedCells === 'function') {
+      const savedCells = storage.getRevealedCells(lv.id) || [];
       for (const [r, c] of savedCells) cw.restoreCell(r, c);
       // После восстановления — авто-зачёт слов, у которых все ячейки открыты.
-      // Не эмитит level-complete если уровень не пройден; если все слова уже
-      // были собраны (теоретически, если приложение закрылось ровно в этот
-      // момент), сразу же сработает финальная отрисовка.
       checkAndMarkRevealedWords();
     }
   }
@@ -84,8 +85,11 @@ export function createGame({ onEvent = () => {}, crossword = null } = {}) {
     levelCompleteEmitted = true;
     storage.markLevelCompleted(level.id);
     // Состояние ячеек уровня больше не нужно — освобождаем место в storage
-    // и гарантируем чистый старт при повторном заходе.
-    storage.clearRevealedCells(level.id);
+    // и гарантируем чистый старт при повторном заходе. Guard на случай
+    // устаревшего закэшированного storage.js.
+    if (typeof storage.clearRevealedCells === 'function') {
+      storage.clearRevealedCells(level.id);
+    }
     onEvent({ type: 'level-complete' });
   }
 
