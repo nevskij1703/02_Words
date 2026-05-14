@@ -203,6 +203,18 @@ button {
   user-select: none;
 }
 
+/* Полупрозрачная подложка под кругом букв (общая для всех) */
+.wheel::before {
+  content: '';
+  position: absolute;
+  inset: 4%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18),
+              0 4px 16px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+}
+
 .wheel-svg {
   position: absolute;
   inset: 0;
