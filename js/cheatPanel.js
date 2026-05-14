@@ -37,28 +37,28 @@ export function showCheatPanel() {
       <div style="margin-bottom:10px">
         <label style="font-size:12px;color:#666">Перейти на уровень (1-${hooks.totalLevels})</label>
         <div style="display:flex;gap:6px;margin-top:4px">
-          <input id="ct-jump-input" type="number" min="1" max="${hooks.totalLevels}" value="${storage.getCurrentLevel() + 1}" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px">
-          <button id="ct-jump" class="primary" style="padding:8px 14px;border-radius:6px;background:#4a9eff;color:#fff;font-weight:600">Go</button>
+          <input id="ct-jump-input" type="number" min="1" max="${hooks.totalLevels}" value="${storage.getCurrentLevel() + 1}" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:8px;font-family:inherit">
+          <button id="ct-jump" style="padding:8px 14px;border-radius:8px;background:linear-gradient(135deg,#5b3eea,#e35aa3);color:#fff;font-weight:700">Go</button>
         </div>
         <div style="display:flex;gap:6px;margin-top:6px">
-          <button id="ct-prev" style="flex:1;padding:8px;border-radius:6px;background:#e8eef7;color:#2a3f5f;font-weight:600">← Предыдущий</button>
-          <button id="ct-next" style="flex:1;padding:8px;border-radius:6px;background:#e8eef7;color:#2a3f5f;font-weight:600">Следующий →</button>
+          <button id="ct-prev" style="flex:1;padding:8px;border-radius:8px;background:rgba(91,62,234,0.08);color:#5b3eea;font-weight:600">← Предыдущий</button>
+          <button id="ct-next" style="flex:1;padding:8px;border-radius:8px;background:rgba(91,62,234,0.08);color:#5b3eea;font-weight:600">Следующий →</button>
         </div>
       </div>
 
       <div style="border-top:1px solid #eee;padding-top:10px;margin-bottom:10px">
-        <button id="ct-skip" style="width:100%;padding:10px;border-radius:8px;background:#ffb84d;color:#4a2e00;font-weight:700">✓ Завершить текущий уровень</button>
+        <button id="ct-skip" style="width:100%;padding:10px;border-radius:10px;background:linear-gradient(135deg,#5b3eea,#e35aa3);color:#fff;font-weight:700;box-shadow:0 6px 16px rgba(91,62,234,0.30)">✓ Завершить текущий уровень</button>
       </div>
 
       <div style="border-top:1px solid #eee;padding-top:10px;margin-bottom:10px">
         <label style="font-size:12px;color:#666">Подсказок ровно</label>
         <div style="display:flex;gap:6px;margin:4px 0 6px">
-          <input id="ct-hint-input" type="number" min="0" max="999" value="${storage.getHints()}" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px">
-          <button id="ct-set-hints" style="padding:8px 14px;border-radius:6px;background:#2a8c52;color:#fff;font-weight:600">Set</button>
+          <input id="ct-hint-input" type="number" min="0" max="999" value="${storage.getHints()}" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:8px;font-family:inherit">
+          <button id="ct-set-hints" style="padding:8px 14px;border-radius:8px;background:#2a8c52;color:#fff;font-weight:700">Set</button>
         </div>
         <div style="display:flex;gap:6px;margin-bottom:6px">
-          <button id="ct-add-hints" style="flex:1;padding:8px;border-radius:6px;background:#2a8c52;color:#fff;font-weight:600">+10 подсказок</button>
-          <button id="ct-99-hints" style="flex:1;padding:8px;border-radius:6px;background:#2a8c52;color:#fff;font-weight:600">Подсказок = 99</button>
+          <button id="ct-add-hints" style="flex:1;padding:8px;border-radius:8px;background:#2a8c52;color:#fff;font-weight:600">+10 подсказок</button>
+          <button id="ct-99-hints" style="flex:1;padding:8px;border-radius:8px;background:#2a8c52;color:#fff;font-weight:600">Подсказок = 99</button>
         </div>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
           <input id="ct-mock-ads" type="checkbox" ${CONFIG.ADS.useMock ? 'checked' : ''}>
@@ -67,11 +67,11 @@ export function showCheatPanel() {
       </div>
 
       <div style="border-top:1px solid #eee;padding-top:10px;margin-bottom:10px">
-        <button id="ct-reset" style="width:100%;padding:10px;border-radius:8px;background:#c44;color:#fff;font-weight:600">⚠ Сбросить весь прогресс</button>
+        <button id="ct-reset" style="width:100%;padding:10px;border-radius:10px;background:#c44;color:#fff;font-weight:700">⚠ Сбросить весь прогресс</button>
       </div>
 
       <div style="border-top:1px solid #eee;padding-top:10px">
-        <button id="ct-close" style="width:100%;padding:10px;border-radius:8px;background:#eee;color:#333;font-weight:600">Закрыть</button>
+        <button id="ct-close" style="width:100%;padding:10px;border-radius:10px;background:#eee;color:#333;font-weight:600">Закрыть</button>
       </div>
     </div>
   `;

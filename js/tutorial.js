@@ -28,17 +28,23 @@ export function markDone() {
   // либо игрок свайпнул main-слово (ui.js вызовет cancel()).
 }
 
-// Минималистичный вектор-указатель: рука, индексный палец вверх (Material-style).
-// Жёлто-оранжевая заливка для контраста с белыми кнопками-буквами +
-// тонкий тёмный контур, нос «давит» круглую тень.
+// Минималистичный вектор-указатель в палитре Aurora.
+// Градиентная заливка (фиолетовый → розовый) + контур цвета чернил
+// для контраста с белыми кнопками-буквами.
 const HAND_SVG = `
 <svg viewBox="0 0 24 24" width="46" height="46" aria-hidden="true">
+  <defs>
+    <linearGradient id="tutHandGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"  stop-color="#5b3eea"/>
+      <stop offset="100%" stop-color="#e35aa3"/>
+    </linearGradient>
+  </defs>
   <g transform="rotate(-15 12 12)">
     <path
       d="M11 2.2c-1.1 0-2 0.9-2 2v8.8L7.5 11.5c-0.6-0.6-1.5-0.6-2.1 0-0.6 0.6-0.6 1.5 0 2.1l3.7 3.7c0.5 0.5 1 0.9 1.6 1.1 0.8 0.3 1.6 0.4 2.5 0.4h2.1c2.2 0 4-1.8 4-4v-3.6c0-0.9-0.6-1.7-1.5-1.9l-4.8-1.2V4.2c0-1.1-0.9-2-2-2z"
-      fill="#ffb84d"
-      stroke="#1a2540"
-      stroke-width="1.4"
+      fill="url(#tutHandGrad)"
+      stroke="#1d1f3a"
+      stroke-width="1.2"
       stroke-linejoin="round"
       stroke-linecap="round"
     />
@@ -66,16 +72,24 @@ export function run(wheelEl, mainWords) {
 
   // Полупрозрачная трасса — такого же цвета, как боевая, но прозрачнее.
   // Подмешиваем в существующий SVG-overlay колеса.
+  // Использует тот же градиент, что и боевая трасса (см. input.js).
+  // Стрим строится через querySelector — `<defs>` уже в wheelSvg есть.
+  const SVG_NS = 'http://www.w3.org/2000/svg';
   const wheelSvg = wheelEl.querySelector('.wheel-svg');
   let tutPolyline = null;
+  let tutGradId = null;
   if (wheelSvg) {
-    tutPolyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    // Заводим собственный градиент с отдельным id, чтобы opacity для трассы
+    // тутора управлялся независимо.
+    const existingGrad = wheelSvg.querySelector('defs linearGradient');
+    if (existingGrad) tutGradId = existingGrad.id;
+    tutPolyline = document.createElementNS(SVG_NS, 'polyline');
     tutPolyline.setAttribute('fill', 'none');
-    tutPolyline.setAttribute('stroke', '#ffb84d');
-    tutPolyline.setAttribute('stroke-width', '3');
+    tutPolyline.setAttribute('stroke', tutGradId ? `url(#${tutGradId})` : '#5b3eea');
+    tutPolyline.setAttribute('stroke-width', '1.4');
     tutPolyline.setAttribute('stroke-linejoin', 'round');
     tutPolyline.setAttribute('stroke-linecap', 'round');
-    tutPolyline.setAttribute('opacity', '0.38');
+    tutPolyline.setAttribute('opacity', '0.55');
     tutPolyline.classList.add('tut-trail');
     wheelSvg.appendChild(tutPolyline);
   }

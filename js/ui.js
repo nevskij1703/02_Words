@@ -10,29 +10,36 @@ import { CONFIG } from './config.js';
 import { showCheatPanel, attachSecretTap, setHooks as setCheatHooks } from './cheatPanel.js';
 import * as tutorial from './tutorial.js';
 
-// Минималистичные SVG-иконки звука. stroke=currentColor → наследуют цвет кнопки.
-const ICON_SOUND_ON = `
-<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <path d="M11 5 L6 9 H3 V15 H6 L11 19 Z"/>
-  <path d="M15.5 8.8 a3.6 3.6 0 0 1 0 6.4"/>
-  <path d="M18.6 5.6 a7.6 7.6 0 0 1 0 12.8"/>
+// Aurora-стилистика: контурные иконки с currentColor + waves-on/off через <g>.
+const ICON_HINT = `
+<svg viewBox="0 0 24 28" fill="none" aria-hidden="true">
+  <path d="M12 2C7.5 2 4 5.5 4 10c0 2.8 1.4 4.7 2.5 6.2c.8 1.1 1.5 2 1.5 3.3v.5h8v-.5c0-1.3.7-2.2 1.5-3.3C18.6 14.7 20 12.8 20 10c0-4.5-3.5-8-8-8z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+  <path d="M9 23h6M10.5 26h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M12 8v6M9.5 11.5L12 14l2.5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
 </svg>`.trim();
 
-const ICON_SOUND_OFF = `
-<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <path d="M11 5 L6 9 H3 V15 H6 L11 19 Z"/>
-  <line x1="16.5" y1="9.5" x2="21.5" y2="14.5"/>
-  <line x1="21.5" y1="9.5" x2="16.5" y2="14.5"/>
+const ICON_SOUND = `
+<svg viewBox="0 0 28 24" fill="none" aria-hidden="true">
+  <path d="M3 9v6h4l6 5V4L7 9H3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" fill="currentColor" fill-opacity="0.12"/>
+  <g class="wave-on">
+    <path d="M17 8c1.5 1.2 2.4 3 2.4 4s-.9 2.8-2.4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+    <path d="M21 5c2.6 1.9 4 4.5 4 7s-1.4 5.1-4 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+  </g>
+  <g class="wave-off" style="display:none;">
+    <path d="M18 8l6 8M24 8l-6 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
 </svg>`.trim();
 
 // === Сборка статической разметки ===
 function buildLayout(app) {
   app.innerHTML = `
     <div class="top-bar">
-      <div class="level-info" id="level-info">Уровень 1</div>
+      <div class="level-info" id="level-info">
+        Уровень<span class="num" id="level-num">1</span>
+      </div>
       <div class="top-buttons">
-        <button class="icon-btn" id="btn-hint" title="Подсказка">💡<span class="badge" id="hint-count">0</span></button>
-        <button class="icon-btn icon-svg" id="btn-sound" title="Звук">${ICON_SOUND_ON}</button>
+        <button class="icon-btn icon-svg" id="btn-hint" title="Подсказка" aria-label="Подсказка">${ICON_HINT}<span class="badge" id="hint-count">0</span></button>
+        <button class="icon-btn icon-svg" id="btn-sound" title="Звук" aria-label="Звук" data-state="on">${ICON_SOUND}</button>
       </div>
     </div>
     <div class="crossword-wrap" id="crossword-wrap"></div>
@@ -58,6 +65,7 @@ export async function mountGame(app, allLevels) {
     hintBtn:    app.querySelector('#btn-hint'),
     hintCount:  app.querySelector('#hint-count'),
     soundBtn:   app.querySelector('#btn-sound'),
+    levelNum:   app.querySelector('#level-num'),
     crosswordW: app.querySelector('#crossword-wrap'),
     bonusRow:   app.querySelector('#bonus-row'),
     currentWord:app.querySelector('#current-word'),
@@ -82,7 +90,12 @@ export async function mountGame(app, allLevels) {
   }
 
   function refreshSoundIcon() {
-    els.soundBtn.innerHTML = audio.isEnabled() ? ICON_SOUND_ON : ICON_SOUND_OFF;
+    const on = audio.isEnabled();
+    els.soundBtn.dataset.state = on ? 'on' : 'off';
+    const waveOn  = els.soundBtn.querySelector('.wave-on');
+    const waveOff = els.soundBtn.querySelector('.wave-off');
+    if (waveOn)  waveOn.style.display  = on ? '' : 'none';
+    if (waveOff) waveOff.style.display = on ? 'none' : '';
   }
 
   function clearBonusRow() {
@@ -105,7 +118,7 @@ export async function mountGame(app, allLevels) {
     els.currentWord.className = 'current-word';
 
     const level = allLevels[idx];
-    els.levelInfo.textContent = `Уровень ${idx + 1}`;
+    if (els.levelNum) els.levelNum.textContent = String(idx + 1);
     refreshHintBadge();
     refreshSoundIcon();
 

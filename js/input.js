@@ -18,17 +18,38 @@ export function createLetterWheel(container, callbacks = {}) {
   container.innerHTML = '';
 
   // SVG для линии соединения. pointer-events:none — чтобы не перехватывать клики.
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  // Aurora: трасса градиентная (фиолетовый → розовый), а не одноцветная.
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(SVG_NS, 'svg');
   svg.classList.add('wheel-svg');
   svg.setAttribute('viewBox', '0 0 100 100');
   svg.setAttribute('preserveAspectRatio', 'none');
-  const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+
+  const defs = document.createElementNS(SVG_NS, 'defs');
+  const grad = document.createElementNS(SVG_NS, 'linearGradient');
+  // Уникальный id на случай нескольких инстансов wheel-а на странице.
+  const gradId = 'wheelTraceGrad_' + Math.random().toString(36).slice(2, 9);
+  grad.setAttribute('id', gradId);
+  grad.setAttribute('x1', '0'); grad.setAttribute('y1', '0');
+  grad.setAttribute('x2', '1'); grad.setAttribute('y2', '1');
+  const stop1 = document.createElementNS(SVG_NS, 'stop');
+  stop1.setAttribute('offset', '0%');
+  stop1.setAttribute('stop-color', '#5b3eea');
+  const stop2 = document.createElementNS(SVG_NS, 'stop');
+  stop2.setAttribute('offset', '100%');
+  stop2.setAttribute('stop-color', '#e35aa3');
+  grad.appendChild(stop1);
+  grad.appendChild(stop2);
+  defs.appendChild(grad);
+  svg.appendChild(defs);
+
+  const polyline = document.createElementNS(SVG_NS, 'polyline');
   polyline.setAttribute('fill', 'none');
-  polyline.setAttribute('stroke', '#ffb84d');
-  polyline.setAttribute('stroke-width', '2.5');
+  polyline.setAttribute('stroke', `url(#${gradId})`);
+  polyline.setAttribute('stroke-width', '1.6');
   polyline.setAttribute('stroke-linejoin', 'round');
   polyline.setAttribute('stroke-linecap', 'round');
-  polyline.setAttribute('opacity', '0.85');
+  polyline.setAttribute('opacity', '0.9');
   svg.appendChild(polyline);
   container.appendChild(svg);
 
