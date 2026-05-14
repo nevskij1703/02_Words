@@ -72,7 +72,7 @@ export function run(wheelEl, options = {}) {
 
   let cancelled = false;
   let cancelCurrent = false;        // прерывание текущей итерации demoWord
-  let stepsCompleted = 0;           // сколько слов уже пройдено через тутор
+  let solvedCount = 0;              // сколько main-слов уже найдено игроком пока тутор активен
   let currentTarget = null;         // слово, которое сейчас показывается
 
   const hand = document.createElement('div');
@@ -223,7 +223,7 @@ export function run(wheelEl, options = {}) {
 
   async function play() {
     await wait(800);
-    while (!cancelled && stepsCompleted < maxSteps) {
+    while (!cancelled) {
       cancelCurrent = false;
       // Получаем актуальную цель: самое короткое ненайденное main-слово.
       const target = (getNextTarget() || '').toString().toUpperCase();
@@ -231,13 +231,14 @@ export function run(wheelEl, options = {}) {
       currentTarget = target;
       await demoWord(target);
       if (cancelled) break;
-      if (cancelCurrent) {
-        // Игрок ввёл показанное слово — засчитываем шаг и берём следующее.
-        stepsCompleted++;
-      } else {
-        // Демо завершилось без угадывания — пауза и повторяем то же слово.
+      if (!cancelCurrent) {
+        // Демо завершилось, а игрок не ввёл показанное слово — пауза и снова
+        // то же самое слово (см. правило «показывать одно и то же пока не введёт»).
         await wait(PAUSE_BETWEEN_LOOPS_MS);
       }
+      // Если cancelCurrent=true — это либо игрок ввёл показанное слово, либо
+      // мы достигли потолка solvedCount (см. notifyWordFound). В обоих случаях
+      // делаем следующий заход (либо сразу выходим если cancelled).
     }
     finish();
   }
@@ -264,13 +265,24 @@ export function run(wheelEl, options = {}) {
   return {
     cancel: finish,
     // ui.js дёргает это при word-main событии (игрок угадал слово).
-    // Если это слово, которое сейчас показывается — прерываем демо
-    // и продвигаем счётчик. Любое другое слово игнорируем (на следующей
-    // итерации getNextTarget сам учтёт его как найденное).
+    // Любое найденное main-слово засчитывается как «тутор помог» — даже если
+    // оно не было текущей целью (игрок мог свайпнуть параллельно или
+    // checkAndMarkRevealedWords мог авто-закрыть слово через перекрестия).
+    // После maxSteps таких событий тутор сразу завершает работу.
     notifyWordFound(word) {
       if (cancelled) return;
       const w = (word || '').toString().toUpperCase();
+      solvedCount++;
+      // Прерываем текущее демо, если игрок ввёл показываемое слово —
+      // на следующей итерации возьмём следующее ненайденное (а если их нет
+      // или достигнут потолок — выйдем).
       if (currentTarget && w === currentTarget) {
+        cancelCurrent = true;
+      }
+      // Жёсткий потолок: после maxSteps собранных слов тутор завершается,
+      // не запуская новых демо.
+      if (solvedCount >= maxSteps) {
+        cancelled = true;
         cancelCurrent = true;
       }
     }
