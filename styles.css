@@ -602,6 +602,91 @@ button {
   color: var(--primary);
 }
 
+/* ===== Rate Us dialog ===== */
+.rate-us-card {
+  /* шире чем стандартный диалог, чтобы 5 звёзд сидели комфортно */
+  padding: 26px 24px 18px;
+  max-width: 340px;
+}
+/* Специфичность .rate-us-card h3.rate-us-title (0,2,1), чтобы перебить
+   стандартный .dialog-card h3 { font-size: 19px } и взять наши 22px. */
+.rate-us-card h3.rate-us-title {
+  margin: 0 0 16px;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.rate-us-stars {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 0 16px;
+  font-size: 38px;
+  line-height: 1;
+  color: #f5b50a;
+  text-shadow: 0 2px 8px rgba(245, 181, 10, 0.45);
+}
+.rate-us-stars span {
+  display: inline-block;
+  animation: starPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.rate-us-stars span:nth-child(1) { animation-delay: 0.05s; }
+.rate-us-stars span:nth-child(2) { animation-delay: 0.12s; }
+.rate-us-stars span:nth-child(3) { animation-delay: 0.19s; }
+.rate-us-stars span:nth-child(4) { animation-delay: 0.26s; }
+.rate-us-stars span:nth-child(5) { animation-delay: 0.33s; }
+@keyframes starPop {
+  from { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.25); opacity: 1; }
+  to   { transform: scale(1); opacity: 1; }
+}
+.rate-us-desc {
+  margin: 0 0 20px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  text-align: center;
+}
+.rate-us-highlight {
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.rate-us-rate-btn {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
+  color: #fff;
+  font-weight: 700;
+  font-size: 17px;
+  box-shadow: 0 8px 20px rgba(91, 62, 234, 0.35);
+  transition: transform 0.1s;
+}
+.rate-us-rate-btn:active { transform: scale(0.96); }
+.rate-us-later-btn {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 10px;
+  background: transparent;
+  color: var(--ink-mute);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  opacity: 0.85;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.rate-us-later-btn:hover { opacity: 1; }
+.rate-us-later-btn:active { transform: scale(0.97); }
+
 /* ===== Hint banner (после 3 ошибок подряд) ===== */
 .hint-banner {
   flex: 0 0 auto;

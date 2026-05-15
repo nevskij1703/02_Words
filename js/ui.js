@@ -10,6 +10,7 @@ import { CONFIG } from './config.js';
 import { showCheatPanel, attachSecretTap, setHooks as setCheatHooks } from './cheatPanel.js';
 import * as tutorial from './tutorial.js';
 import * as cells from './cells.js';
+import * as rateUs from './rateUs.js';
 
 // Aurora-стилистика: контурные иконки с currentColor + waves-on/off через <g>.
 const ICON_HINT = `
@@ -91,6 +92,15 @@ export async function mountGame(app, allLevels) {
   };
 
   let tutorialControl = null;
+
+  // Регистрируем игровую сессию (для логики Rate Us — окно появляется только
+  // со 2-й сессии и далее, и только один раз за сессию). bumpSessionIfNew()
+  // идемпотентно для одной сессии благодаря sessionStorage-маркеру.
+  rateUs.bumpSessionIfNew();
+  // Сколько уровней игрок ЗАВЕРШИЛ в текущей сессии. Увеличивается по нажатию
+  // «Дальше» на экране победы. Когда == 2 (т.е. идём в 3-й уровень сессии) —
+  // показываем окно Rate Us вместо очередной интерстишиал-рекламы.
+  let levelsCompletedThisSession = 0;
 
   let currentLevelIdx = storage.getCurrentLevel();
   if (currentLevelIdx >= allLevels.length) currentLevelIdx = allLevels.length - 1;
@@ -387,11 +397,22 @@ export async function mountGame(app, allLevels) {
         showEndScreen();
         return;
       }
+      // Засчитываем уровень в счётчик текущей игровой сессии.
+      // ВАЖНО: инкрементируем именно здесь (а не в level-complete), потому что
+      // RateUs показывается ПЕРЕД стартом следующего уровня, и нам важен счёт
+      // именно «уровней, после которых игрок нажал Дальше в этой сессии».
+      levelsCompletedThisSession++;
+
       currentLevelIdx = nextIdx;
       // Сохраняем индекс СРАЗУ — если приложение умрёт во время показа
-      // рекламы, при перезапуске мы окажемся на правильном уровне.
+      // рекламы или окна, при перезапуске мы окажемся на правильном уровне.
       storage.setCurrentLevel(currentLevelIdx);
-      if (ads.shouldShowInterstitial(currentLevelIdx)) {
+
+      // Окно Rate Us приоритетнее интерстишиала: если запланирован показ,
+      // рекламу не запускаем (два модальных оверлея подряд — плохой UX).
+      if (rateUs.shouldShowOnLevelStart(levelsCompletedThisSession)) {
+        await rateUs.showRateUsDialog();
+      } else if (ads.shouldShowInterstitial(currentLevelIdx)) {
         await ads.showInterstitialAd();
       }
       loadLevel(currentLevelIdx);

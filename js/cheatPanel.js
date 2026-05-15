@@ -8,6 +8,7 @@
 import { CONFIG } from './config.js';
 import * as storage from './storage.js';
 import * as cells from './cells.js';
+import * as rateUs from './rateUs.js';
 
 // Подписки, которые установит ui.js — чтобы панель могла дёрнуть «загрузить уровень N»
 // без знания внутренней структуры UI.
@@ -145,6 +146,9 @@ export function showCheatPanel() {
     if (!confirm('Точно сбросить весь прогресс?')) return;
     storage.reset();
     cells.clearAll();
+    // Сбрасываем и состояние Rate Us: счётчик сессий → 0, флаг «оценил» → off.
+    // Это позволяет повторно увидеть окно после отладочного reset.
+    rateUs.clearAll();
     close();
     hooks.onJumpTo && hooks.onJumpTo(0);
   });
