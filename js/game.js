@@ -113,6 +113,55 @@ export function createGame({ onEvent = () => {}, crossword = null } = {}) {
     if (isLevelComplete()) emitLevelComplete();
   }
 
+  // Ячейки конкретного placement-а (для проверки пересечений).
+  function placementCells(p) {
+    const word = normalize(p.word);
+    const out = [];
+    for (let i = 0; i < word.length; i++) {
+      const r = p.direction === 'horizontal' ? p.row : p.row + i;
+      const c = p.direction === 'horizontal' ? p.col + i : p.col;
+      out.push([r, c]);
+    }
+    return out;
+  }
+  function placementsIntersect(p1, p2) {
+    const a = placementCells(p1);
+    const b = placementCells(p2);
+    for (const [r1, c1] of a) {
+      for (const [r2, c2] of b) {
+        if (r1 === r2 && c1 === c2) return true;
+      }
+    }
+    return false;
+  }
+
+  // Возвращает true, если введённое короткое main-слово w является substring
+  // какого-то ещё не открытого main-слова И их placements пересекаются по
+  // ячейкам сетки. Тогда мы НЕ зачитываем w: иначе раскрытие placement-а w
+  // раскроет несколько ячеек длинного слова, и игрок воспринимает это как
+  // «частичное открытие». Пример — уровень 14: ПАР ⊂ ПАРА ⊂ ПАРАД, все три
+  // placements пересекаются. Свайп «ПАР» раньше открывал 3 буквы внутри ПАРА
+  // и одну букву ПАРАД, что выглядело как баг.
+  //
+  // Substring-пары БЕЗ пересечения placements (например, РАМА ⊂ ДРАМА на том
+  // же уровне 14, где РАМА вертикально в столбце 5, а ДРАМА горизонтально в
+  // строке 4) — НЕ блокируются, потому что раскрытие РАМА не задевает ячейки
+  // ДРАМА.
+  function blocksAsSubstringOfUnrevealed(w) {
+    if (!level) return false;
+    const placeShort = level.placements.find(p => normalize(p.word) === w);
+    if (!placeShort) return false;
+    for (const longer of mainSet) {
+      if (longer === w) continue;
+      if (longer.length <= w.length) continue;
+      if (foundMain.has(longer)) continue;
+      if (!longer.includes(w)) continue;
+      const placeLong = level.placements.find(p => normalize(p.word) === longer);
+      if (placeLong && placementsIntersect(placeShort, placeLong)) return true;
+    }
+    return false;
+  }
+
   function submitWord(word) {
     const w = normalize(word);
     if (!level || w.length < 3) {
@@ -130,6 +179,14 @@ export function createGame({ onEvent = () => {}, crossword = null } = {}) {
       if (foundMain.has(w)) {
         onEvent({ type: 'word-already', word: w });
         return { kind: 'already' };
+      }
+      // Защита от «частичного открытия» длинного слова через его substring:
+      // см. blocksAsSubstringOfUnrevealed выше. Откатываем как invalid —
+      // игрок получает шейк/звук ошибки, счётчик ошибок продолжает расти.
+      if (blocksAsSubstringOfUnrevealed(w)) {
+        onEvent({ type: 'word-invalid', word: w });
+        noteWrong();
+        return { kind: 'invalid' };
       }
       foundMain.add(w);
       storage.incWordsFound(1);
