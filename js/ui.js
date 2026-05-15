@@ -408,11 +408,26 @@ export async function mountGame(app, allLevels) {
       // рекламы или окна, при перезапуске мы окажемся на правильном уровне.
       storage.setCurrentLevel(currentLevelIdx);
 
-      // Окно Rate Us приоритетнее интерстишиала: если запланирован показ,
-      // рекламу не запускаем (два модальных оверлея подряд — плохой UX).
+      // Окно Rate Us всегда показывается ПЕРЕД интерстишиалом (если оно
+      // вообще запланировано) — обратный порядок нелогичен (после рекламы
+      // игрок раздражён, оценку просить бессмысленно).
+      //
+      // Что делаем с рекламой после закрытия окна:
+      //   - 'rate'   → игрок только что сделал нам услугу, рекламу пропускаем,
+      //                чтобы не портить позитивный момент;
+      //   - 'later'  → игрок отказался; ведём себя как обычно — если интерстишиал
+      //                на этом переходе запланирован, показываем после RateUs.
+      // Если RateUs вообще не сработал — стандартный путь, только реклама.
+      let showInterstitial = false;
       if (rateUs.shouldShowOnLevelStart(levelsCompletedThisSession)) {
-        await rateUs.showRateUsDialog();
+        const { action } = await rateUs.showRateUsDialog();
+        if (action === 'later' && ads.shouldShowInterstitial(currentLevelIdx)) {
+          showInterstitial = true;
+        }
       } else if (ads.shouldShowInterstitial(currentLevelIdx)) {
+        showInterstitial = true;
+      }
+      if (showInterstitial) {
         await ads.showInterstitialAd();
       }
       loadLevel(currentLevelIdx);
