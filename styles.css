@@ -182,6 +182,8 @@ button {
 }
 
 /* ===== Icon buttons ===== */
+/* Без inset-«glare» сверху — обводка читается так же, как у плашки
+   «Уровень N» (та же толщина и тот же --glass-border). */
 .icon-btn {
   position: relative;
   width: 52px;
@@ -191,7 +193,7 @@ button {
   -webkit-backdrop-filter: blur(14px) saturate(140%);
           backdrop-filter: blur(14px) saturate(140%);
   border: 1px solid var(--glass-border);
-  box-shadow: var(--glow), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: var(--glow);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -200,7 +202,7 @@ button {
 }
 .icon-btn:active {
   transform: scale(0.93);
-  box-shadow: var(--glow-strong), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: var(--glow-strong);
 }
 .icon-btn svg {
   display: block;
