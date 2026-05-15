@@ -1,10 +1,12 @@
 // cheatPanel.js — внутриигровая чит-панель для разработчика/тестера.
+// DEV-ONLY: всё содержимое ниже вырезается в release-сборке через html2apk.
 //
 // Активация: 5 быстрых тапов по «Уровень N» в верхнем баре (см. ui.js).
 //
 // Открывает оверлей с действиями: переход на уровень, завершение текущего,
 // сброс прогресса, добавление подсказок, переключение mock-рекламы.
 
+// HTML2APK:DEV_ONLY_BEGIN
 import { CONFIG } from './config.js';
 import * as storage from './storage.js';
 import * as cells from './cells.js';
@@ -171,3 +173,4 @@ export function attachSecretTap(el, callback, requiredTaps = null, windowMs = 15
     }
   });
 }
+// HTML2APK:DEV_ONLY_END

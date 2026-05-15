@@ -1,6 +1,9 @@
 // devPanel.js — панель разработчика. Доступна через ?dev=1.
-// Динамически импортируется из main.js — не попадает в production-бандл при ?dev=0.
+// DEV-ONLY: всё содержимое ниже вырезается в release-сборке через html2apk.
+// (раньше: «динамически импортируется из main.js — не попадает в production-бандл при ?dev=0»
+//  — теперь дополнительно защищено маркером, даже если кто-то нашёл бы файл в APK.)
 
+// HTML2APK:DEV_ONLY_BEGIN
 import { generateLevel, validateLevel, placeWords, findFormableWords } from './levelGenerator.js';
 import { render as renderCrossword } from './crossword.js';
 import { HAND_CRAFTED_LEVELS, canFormWord } from './levels.js';
@@ -265,3 +268,4 @@ export function mountDevPanel(app) {
 
   refreshSavedList();
 }
+// HTML2APK:DEV_ONLY_END

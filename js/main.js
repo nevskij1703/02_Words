@@ -25,6 +25,7 @@ async function bootstrap() {
   const app = document.getElementById('app');
   app.innerHTML = ''; // убрать loading screen
 
+  // HTML2APK:DEV_ONLY_BEGIN
   if (devMode) {
     try {
       const mod = await import('./devPanel.js');
@@ -35,6 +36,7 @@ async function bootstrap() {
     }
     return;
   }
+  // HTML2APK:DEV_ONLY_END
 
   // Собираем массив уровней: ручные + сгенерированные.
   let levels = [...HAND_CRAFTED_LEVELS];

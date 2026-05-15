@@ -7,7 +7,9 @@ import * as audio from './audio.js';
 import * as ads from './ads.js';
 import * as storage from './storage.js';
 import { CONFIG } from './config.js';
+// HTML2APK:DEV_ONLY_BEGIN
 import { showCheatPanel, attachSecretTap, setHooks as setCheatHooks } from './cheatPanel.js';
+// HTML2APK:DEV_ONLY_END
 import * as tutorial from './tutorial.js';
 import * as cells from './cells.js';
 import * as rateUs from './rateUs.js';
@@ -452,6 +454,7 @@ export async function mountGame(app, allLevels) {
   }
 
   // === Чит-панель (5 быстрых тапов по заголовку уровня) ===
+  // HTML2APK:DEV_ONLY_BEGIN
   setCheatHooks({
     totalLevels: allLevels.length,
     onJumpTo: (idx) => {
@@ -468,6 +471,7 @@ export async function mountGame(app, allLevels) {
   if (new URLSearchParams(location.search).get('cheat') === '1') {
     setTimeout(() => showCheatPanel(), 200);
   }
+  // HTML2APK:DEV_ONLY_END
 
   // === Запуск ===
   // Если игрок в прошлой сессии не досмотрел интерстишиал и быстро вернулся,
@@ -484,6 +488,8 @@ export async function mountGame(app, allLevels) {
   return {
     nextLevel: () => loadLevel(currentLevelIdx + 1),
     reload:    () => loadLevel(currentLevelIdx),
-    showCheatPanel
+    // HTML2APK:DEV_ONLY_BEGIN
+    showCheatPanel,
+    // HTML2APK:DEV_ONLY_END
   };
 }
