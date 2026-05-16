@@ -13,6 +13,7 @@ import { showCheatPanel, attachSecretTap, setHooks as setCheatHooks } from './ch
 import * as tutorial from './tutorial.js';
 import * as cells from './cells.js';
 import * as rateUs from './rateUs.js';
+import { showSettingsDialog } from './settings.js';
 
 // Aurora-стилистика: контурные иконки с currentColor + waves-on/off через <g>.
 const ICON_HINT = `
@@ -22,29 +23,14 @@ const ICON_HINT = `
   <path d="M12 8v6M9.5 11.5L12 14l2.5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
 </svg>`.trim();
 
-const ICON_SOUND = `
-<svg viewBox="0 0 28 24" fill="none" aria-hidden="true">
-  <path d="M3 9v6h4l6 5V4L7 9H3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" fill="currentColor" fill-opacity="0.12"/>
-  <g class="wave-on">
-    <path d="M17 8c1.5 1.2 2.4 3 2.4 4s-.9 2.8-2.4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/>
-    <path d="M21 5c2.6 1.9 4 4.5 4 7s-1.4 5.1-4 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/>
-  </g>
-  <g class="wave-off" style="display:none;">
-    <path d="M18 8l6 8M24 8l-6 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-  </g>
-</svg>`.trim();
-
-// Иконка темы: солнце (показывается при light), луна (при dark).
-// Принцип «показываем текущее состояние» — глядя на иконку понятно какой режим включён.
-const ICON_THEME = `
+// Иконка «настройки» — шестерёнка. Объединяет старые звук+тему: тапаем
+// здесь → открывается окно настроек с тоглами + ссылкой на политику.
+const ICON_SETTINGS = `
 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-  <g class="theme-sun">
-    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.8" fill="currentColor" fill-opacity="0.18"/>
-    <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4l1.4-1.4M17 7l1.4-1.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-  </g>
-  <g class="theme-moon" style="display:none;">
-    <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" fill="currentColor" fill-opacity="0.18"/>
-  </g>
+  <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z"
+        stroke="currentColor" stroke-width="1.8" fill="currentColor" fill-opacity="0.18"/>
+  <path d="M19.4 13.6c.04-.5.06-1.1.06-1.6s-.02-1.1-.06-1.6l2.1-1.6-2-3.4-2.4 1c-.8-.6-1.7-1.1-2.6-1.4L14 2.5h-4l-.5 2.5c-.9.3-1.8.8-2.6 1.4l-2.4-1-2 3.4 2.1 1.6c-.04.5-.06 1.1-.06 1.6s.02 1.1.06 1.6l-2.1 1.6 2 3.4 2.4-1c.8.6 1.7 1.1 2.6 1.4l.5 2.5h4l.5-2.5c.9-.3 1.8-.8 2.6-1.4l2.4 1 2-3.4-2.1-1.6z"
+        stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="none"/>
 </svg>`.trim();
 
 // === Сборка статической разметки ===
@@ -56,8 +42,7 @@ function buildLayout(app) {
       </div>
       <div class="top-buttons">
         <button class="icon-btn icon-svg" id="btn-hint" title="Подсказка" aria-label="Подсказка">${ICON_HINT}<span class="badge" id="hint-count">0</span></button>
-        <button class="icon-btn icon-svg" id="btn-sound" title="Звук" aria-label="Звук" data-state="on">${ICON_SOUND}</button>
-        <button class="icon-btn icon-svg" id="btn-theme" title="Тема" aria-label="Тема" data-state="light">${ICON_THEME}</button>
+        <button class="icon-btn icon-svg" id="btn-settings" title="Настройки" aria-label="Настройки">${ICON_SETTINGS}</button>
       </div>
     </div>
     <div class="crossword-wrap" id="crossword-wrap"></div>
@@ -82,8 +67,7 @@ export async function mountGame(app, allLevels) {
     levelInfo:  app.querySelector('#level-info'),
     hintBtn:    app.querySelector('#btn-hint'),
     hintCount:  app.querySelector('#hint-count'),
-    soundBtn:   app.querySelector('#btn-sound'),
-    themeBtn:   app.querySelector('#btn-theme'),
+    settingsBtn:app.querySelector('#btn-settings'),
     levelNum:   app.querySelector('#level-num'),
     crosswordW: app.querySelector('#crossword-wrap'),
     bonusRow:   app.querySelector('#bonus-row'),
@@ -117,40 +101,18 @@ export async function mountGame(app, allLevels) {
     els.hintCount.style.display = h > 0 ? '' : 'none';
   }
 
-  function refreshSoundIcon() {
-    const on = audio.isEnabled();
-    els.soundBtn.dataset.state = on ? 'on' : 'off';
-    const waveOn  = els.soundBtn.querySelector('.wave-on');
-    const waveOff = els.soundBtn.querySelector('.wave-off');
-    if (waveOn)  waveOn.style.display  = on ? '' : 'none';
-    if (waveOff) waveOff.style.display = on ? 'none' : '';
-  }
-
   function currentTheme() {
     const s = storage.getSettings();
     return s.theme === 'dark' ? 'dark' : 'light';
   }
 
+  // Применяет тему: data-theme на <html> (для CSS-переменных) + theme-color
+  // в meta для системного статус-бара. Пробрасывается в settings.js,
+  // чтобы окно настроек могло переключать тему через тот же путь.
   function applyTheme(theme) {
     document.documentElement.dataset.theme = theme;
-    // На мобиле обновляем системный theme-color, чтобы статус-бар тоже
-    // подстроился под фон страницы.
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', theme === 'dark' ? '#0a0820' : '#f4ecf7');
-    if (els.themeBtn) {
-      els.themeBtn.dataset.state = theme;
-      const sun  = els.themeBtn.querySelector('.theme-sun');
-      const moon = els.themeBtn.querySelector('.theme-moon');
-      // Показываем иконку ТЕКУЩЕГО состояния.
-      if (sun)  sun.style.display  = theme === 'light' ? '' : 'none';
-      if (moon) moon.style.display = theme === 'dark'  ? '' : 'none';
-    }
-  }
-
-  function toggleTheme() {
-    const next = currentTheme() === 'dark' ? 'light' : 'dark';
-    storage.setSetting('theme', next);
-    applyTheme(next);
   }
 
   function clearBonusRow() {
@@ -175,7 +137,6 @@ export async function mountGame(app, allLevels) {
     const level = allLevels[idx];
     if (els.levelNum) els.levelNum.textContent = String(idx + 1);
     refreshHintBadge();
-    refreshSoundIcon();
 
     cwApi = crossword.render(level, els.crosswordW, {
       // Каждое открытие ячейки (свайп/подсказка/чит-завершение) пишется
@@ -336,15 +297,9 @@ export async function mountGame(app, allLevels) {
     if (game) game.useHint();
   });
 
-  els.soundBtn.addEventListener('click', () => {
-    const on = audio.toggle();
-    if (on) audio.play('click');
-    refreshSoundIcon();
-  });
-
-  els.themeBtn.addEventListener('click', () => {
+  els.settingsBtn.addEventListener('click', () => {
     audio.play('click');
-    toggleTheme();
+    showSettingsDialog({ audio, storage, applyTheme });
   });
 
   // Применяем сохранённую тему сразу при монтировании.
