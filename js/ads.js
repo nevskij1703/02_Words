@@ -27,12 +27,29 @@
 import { CONFIG } from './config.js';
 
 const PENDING_KEY = '02words_pending_interstitial';
+// Таймаут на ожидание callback'а от Java. Без него Promise висит вечно
+// (например, если SDK init не успел подняться или unit-ID на модерации,
+// и onAdFailedToLoad по какой-то причине не дошёл). 30 сек — щедро,
+// показ обычно укладывается в 5-15 сек включая loading.
+const CALLBACK_TIMEOUT_MS = 30_000;
 
 let backend = 'mock';
 let pendingInterstitial = null;
 let pendingRewarded = null;
+let pendingInterstitialTimer = null;
+let pendingRewardedTimer = null;
 let lastInterstitialShownAt = 0;   // ms epoch, in-memory only (per session)
 let pendingResumeFlag = false;     // взведён при initAds если нашли свежий pending
+
+// Какой unit-ID использовать — реальный или Yandex demo. Demo всегда
+// показывает тестовое объявление, поэтому полезен для проверки что
+// SDK + bridge подняты корректно (см. CONFIG.ADS.useDemoUnits).
+function pickInterstitialUnit() {
+  return CONFIG.ADS.useDemoUnits ? CONFIG.ADS.unitInterstitialDemo : CONFIG.ADS.unitInterstitial;
+}
+function pickRewardedUnit() {
+  return CONFIG.ADS.useDemoUnits ? CONFIG.ADS.unitRewardedDemo : CONFIG.ADS.unitRewarded;
+}
 
 function setupNativeCallback() {
   // Глобальный канал получения событий от Java-стороны.
@@ -40,14 +57,17 @@ function setupNativeCallback() {
   //   kind:  'interstitial' | 'rewarded'
   //   event: 'closed' | 'rewarded'
   window.__yandexAdsCallback = (kind, event) => {
+    console.log('[ads] callback:', kind, event);
     if (kind === 'interstitial' && pendingInterstitial) {
       const resolve = pendingInterstitial;
       pendingInterstitial = null;
+      if (pendingInterstitialTimer) { clearTimeout(pendingInterstitialTimer); pendingInterstitialTimer = null; }
       resolve({ shown: true });
     }
     if (kind === 'rewarded' && pendingRewarded) {
       const resolve = pendingRewarded;
       pendingRewarded = null;
+      if (pendingRewardedTimer) { clearTimeout(pendingRewardedTimer); pendingRewardedTimer = null; }
       resolve({ rewarded: event === 'rewarded' });
     }
   };
@@ -56,16 +76,20 @@ function setupNativeCallback() {
 function preloadInterstitial() {
   if (backend !== 'native') return;
   if (!window.YandexAds || typeof window.YandexAds.preloadInterstitial !== 'function') return;
+  const unit = pickInterstitialUnit();
   try {
-    window.YandexAds.preloadInterstitial(CONFIG.ADS.unitInterstitial);
+    console.log('[ads] preload interstitial unit=', unit);
+    window.YandexAds.preloadInterstitial(unit);
   } catch (e) { console.warn('[ads] preload interstitial skipped:', e); }
 }
 
 function preloadRewarded() {
   if (backend !== 'native') return;
   if (!window.YandexAds || typeof window.YandexAds.preloadRewarded !== 'function') return;
+  const unit = pickRewardedUnit();
   try {
-    window.YandexAds.preloadRewarded(CONFIG.ADS.unitRewarded);
+    console.log('[ads] preload rewarded unit=', unit);
+    window.YandexAds.preloadRewarded(unit);
   } catch (e) { console.warn('[ads] preload rewarded skipped:', e); }
 }
 
@@ -164,13 +188,26 @@ export async function showInterstitialAd() {
   let result = { shown: false };
   try {
     if (backend === 'native') {
+      const unit = pickInterstitialUnit();
+      console.log('[ads] showInterstitial unit=', unit);
       result = await new Promise(resolve => {
         pendingInterstitial = resolve;
+        // Защитный таймаут: если callback не пришёл за 30 сек — выдаём
+        // shown:false и идём дальше, иначе UI ждал бы вечно.
+        pendingInterstitialTimer = setTimeout(() => {
+          if (pendingInterstitial) {
+            console.warn('[ads] interstitial callback timeout — assume not shown');
+            pendingInterstitial = null;
+            pendingInterstitialTimer = null;
+            resolve({ shown: false });
+          }
+        }, CALLBACK_TIMEOUT_MS);
         try {
-          window.YandexAds.showInterstitial(CONFIG.ADS.unitInterstitial);
+          window.YandexAds.showInterstitial(unit);
         } catch (err) {
           console.warn('[ads] native interstitial failed', err);
           pendingInterstitial = null;
+          if (pendingInterstitialTimer) { clearTimeout(pendingInterstitialTimer); pendingInterstitialTimer = null; }
           resolve({ shown: false });
         }
       });
@@ -197,13 +234,25 @@ export async function showInterstitialAd() {
 
 export function showRewardedAd() {
   if (backend === 'native') {
+    const unit = pickRewardedUnit();
+    console.log('[ads] showRewarded unit=', unit);
     return new Promise(resolve => {
       pendingRewarded = resolve;
+      // См. комментарий в showInterstitialAd — без таймаута Promise висит вечно.
+      pendingRewardedTimer = setTimeout(() => {
+        if (pendingRewarded) {
+          console.warn('[ads] rewarded callback timeout — assume not granted');
+          pendingRewarded = null;
+          pendingRewardedTimer = null;
+          resolve({ rewarded: false });
+        }
+      }, CALLBACK_TIMEOUT_MS);
       try {
-        window.YandexAds.showRewarded(CONFIG.ADS.unitRewarded);
+        window.YandexAds.showRewarded(unit);
       } catch (err) {
         console.warn('[ads] native rewarded failed', err);
         pendingRewarded = null;
+        if (pendingRewardedTimer) { clearTimeout(pendingRewardedTimer); pendingRewardedTimer = null; }
         resolve({ rewarded: false });
       }
     }).then(res => {

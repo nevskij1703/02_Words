@@ -19,6 +19,15 @@ export const CONFIG = {
   // автоматически падаем в mock с DOM-оверлеем.
   ADS: {
     useMock: false,                 // true → принудительный mock даже если bridge доступен (полезно для dev)
+    // useDemoUnits: на устройстве вместо реальных unit-ID использовать
+    // demo-id от Yandex (всегда показывают тестовое объявление). Нужно для
+    // дебага: если реальные unit'ы ещё на модерации в Yandex Partner, SDK
+    // отвечает no-fill и реклама «не запускается». С demo сразу видно
+    // работает ли пайплайн SDK→Java→JS как таковой. **Перед публикацией
+    // в стор обязательно вернуть в false.**
+    useDemoUnits: true,
+    unitInterstitialDemo: 'demo-interstitial-yandex',
+    unitRewardedDemo:     'demo-rewarded-yandex',
     // Yandex Mobile Ads unit-ID (partner.yandex.ru/mobile-ads).
     unitInterstitial: 'R-M-19273487-1',
     unitRewarded:     'R-M-19273487-2',
