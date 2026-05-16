@@ -44,8 +44,8 @@ python scripts/dev_server.py 8772
 ### Unit-ID (Yandex Mobile Ads)
 
 В [js/config.js](js/config.js), секция `CONFIG.ADS`:
-- `unitInterstitial: 'R-M-19273487-1'`
-- `unitRewarded:     'R-M-19273487-2'`
+- `unitInterstitial: 'R-M-19273571-1'`
+- `unitRewarded:     'R-M-19273571-2'`
 
 Источник: [Yandex Partner / Mobile Ads](https://partner.yandex.ru/mobile-ads).
 

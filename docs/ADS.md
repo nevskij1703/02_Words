@@ -19,8 +19,10 @@
 Точки вызова — [js/ui.js](../js/ui.js):226–243 (баннер hint), 258–281 (диалог), 307–309 (после уровня).
 
 Unit-ID в [js/config.js](../js/config.js):
-- Interstitial: `R-M-19273487-1`
-- Rewarded: `R-M-19273487-2`
+- Interstitial: `R-M-19273571-1`
+- Rewarded: `R-M-19273571-2`
+
+(Привязаны к приложению `com.terekh.words` в Yandex Partner. Перепутать с unit'ами от другой игры — реклама не покажется, SDK ответит no-fill.)
 
 Источник: [Yandex Partner Mobile Ads](https://partner.yandex.ru/mobile-ads).
 

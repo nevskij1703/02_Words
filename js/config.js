@@ -20,17 +20,18 @@ export const CONFIG = {
   ADS: {
     useMock: false,                 // true → принудительный mock даже если bridge доступен (полезно для dev)
     // useDemoUnits: на устройстве вместо реальных unit-ID использовать
-    // demo-id от Yandex (всегда показывают тестовое объявление). Нужно для
-    // дебага: если реальные unit'ы ещё на модерации в Yandex Partner, SDK
-    // отвечает no-fill и реклама «не запускается». С demo сразу видно
-    // работает ли пайплайн SDK→Java→JS как таковой. **Перед публикацией
-    // в стор обязательно вернуть в false.**
-    useDemoUnits: true,
+    // demo-id от Yandex (всегда показывают тестовое объявление). Полезно
+    // как контрольная проверка пайплайна SDK→Java→JS, если реальные unit'ы
+    // отвечают no-fill. По умолчанию выключено — продакшен использует
+    // реальные unit-ID. **Перед публикацией всегда оставлять в false.**
+    useDemoUnits: false,
     unitInterstitialDemo: 'demo-interstitial-yandex',
     unitRewardedDemo:     'demo-rewarded-yandex',
     // Yandex Mobile Ads unit-ID (partner.yandex.ru/mobile-ads).
-    unitInterstitial: 'R-M-19273487-1',
-    unitRewarded:     'R-M-19273487-2',
+    // ВНИМАНИЕ: ID привязаны к конкретному приложению в Yandex Partner.
+    // Перепутать с unit'ами от другой игры — реклама не покажется.
+    unitInterstitial: 'R-M-19273571-1',
+    unitRewarded:     'R-M-19273571-2',
     // Интерстишиал-расписание:
     //   - не показывать до перехода на N-й уровень (zero-based, idx=3 → L4);
     //   - между двумя показами в одной сессии — минимум cooldownMs;
