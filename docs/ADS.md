@@ -13,8 +13,19 @@
 
 | Слот | Когда показывается | Метод | unit-ID |
 |---|---|---|---|
-| **Interstitial** | После уровня, через `shouldShowInterstitial(idx)` (по умолчанию каждый уровень начиная с 3-го) | `showInterstitialAd()` | `CONFIG.ADS.unitInterstitial` |
+| **Interstitial** | **ВЫКЛЮЧЕН** (`CONFIG.ADS.interstitialEnabled: false`). При включении: после уровня, через `shouldShowInterstitial(idx)`, начиная с 3-го уровня | `showInterstitialAd()` | `CONFIG.ADS.unitInterstitial` |
 | **Rewarded** | Кнопка «Использовать подсказку» при `hints === 0`, либо диалог «Подсказки закончились → Смотреть» | `showRewardedAd()` | `CONFIG.ADS.unitRewarded` |
+
+### Почему interstitial выключен
+
+С 2026-05-27 межстраничная реклама отключена одним флагом `CONFIG.ADS.interstitialEnabled = false`: игроки жаловались на неё в отзывах, а доход с неё был незначительным на фоне rewarded. Флаг гасит **все** пути показа:
+
+- `shouldShowInterstitial()` → всегда `false` (путь «после уровня» в `ui.js`);
+- `showInterstitialAd()` → ранний выход `{ shown: false, skipped: true }` даже при прямом вызове (страховка для resume-пути в `ui.js`);
+- `initAds()` → не взводит resume-флаг и чистит старый localStorage-штамп `02words_pending_interstitial`;
+- `preloadInterstitial()` → не тратит трафик игрока на загрузку невидимой рекламы.
+
+Rewarded этим флагом **не управляется** и работает как раньше. Чтобы вернуть interstitial — достаточно поставить `interstitialEnabled: true`, расписание (min-level + кулдаун + resume) осталось нетронутым.
 
 Точки вызова — [js/ui.js](../js/ui.js):226–243 (баннер hint), 258–281 (диалог), 307–309 (после уровня).
 

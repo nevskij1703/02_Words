@@ -5,7 +5,12 @@
 //            и шлёт результаты в window.__yandexAdsCallback(kind, event).
 //   mock   — DOM-оверлей для dev-режима в браузере.
 //
-// Расписание интерстишиалов (CONFIG.ADS):
+// ⚠️ Интерстишиалы сейчас ВЫКЛЮЧЕНЫ (CONFIG.ADS.interstitialEnabled = false),
+// в проде работает только rewarded. Причина — жалобы игроков на рекламу между
+// уровнями при копеечном доходе с неё. Всё расписание ниже сохранено рабочим
+// и включается обратно одним флагом.
+//
+// Расписание интерстишиалов (CONFIG.ADS, при interstitialEnabled: true):
 //   - не показываем до перехода на CONFIG.ADS.interstitialMinLevel-й уровень
 //     (zero-based). По умолчанию 3 → первая возможность = переход на L4.
 //   - между двумя успешными показами — кулдаун CONFIG.ADS.interstitialCooldownMs
@@ -29,9 +34,16 @@ import { CONFIG } from './config.js';
 const PENDING_KEY = '02words_pending_interstitial';
 // Таймаут на ожидание callback'а от Java. Без него Promise висит вечно
 // (например, если SDK init не успел подняться или unit-ID на модерации,
-// и onAdFailedToLoad по какой-то причине не дошёл). 30 сек — щедро,
-// показ обычно укладывается в 5-15 сек включая loading.
-const CALLBACK_TIMEOUT_MS = 30_000;
+// и onAdFailedToLoad по какой-то причине не дошёл).
+//
+// 120 сек — страховка от молчаливого зависания SDK, но достаточно чтобы
+// не сработать на нормальной рекламе. Yandex rewarded video по их docs
+// макс ~60 сек видео + ~5 сек закрытие; interstitial обычно 10-15 сек.
+// Раньше стоял 30 сек, и rewarded с длинным роликом не успевал — JS
+// отказывался ждать раньше окончания, а потом запоздалый callback от Java
+// уже не доходил до UI (pendingRewarded занullit при таймауте) → reward
+// терялся. См. logcat от 14:48 в дебаг-сессии 17.05.2026.
+const CALLBACK_TIMEOUT_MS = 120_000;
 
 let backend = 'mock';
 let pendingInterstitial = null;
@@ -73,7 +85,14 @@ function setupNativeCallback() {
   };
 }
 
+// Интерстишиалы полностью выключены? См. CONFIG.ADS.interstitialEnabled.
+// Rewarded этим флагом НЕ управляется.
+function interstitialsEnabled() {
+  return CONFIG.ADS.interstitialEnabled !== false;
+}
+
 function preloadInterstitial() {
+  if (!interstitialsEnabled()) return;   // не тянем то, что не покажем
   if (backend !== 'native') return;
   if (!window.YandexAds || typeof window.YandexAds.preloadInterstitial !== 'function') return;
   const unit = pickInterstitialUnit();
@@ -156,6 +175,14 @@ function makeOverlay(text, durationMs) {
 
 export async function initAds() {
   detectBackend();
+  if (!interstitialsEnabled()) {
+    // Интерстишиалы выключены — resume-триггер не взводим. Штамп от прошлых
+    // версий (когда реклама ещё показывалась) чистим ниже, чтобы он не ждал
+    // своего часа, если интерстишиалы когда-нибудь включат обратно.
+    console.log('[ads] interstitials disabled by config — rewarded only');
+    clearPendingTs();
+    return;
+  }
   // Восстановление: если игрок не досмотрел интерстишиал в прошлой сессии
   // и перезапустил приложение быстро — форсим показ при первом загрузке уровня.
   const pendingAt = readPendingTs();
@@ -179,6 +206,13 @@ export function consumePendingResume() {
 }
 
 export async function showInterstitialAd() {
+  // Жёсткий guard: даже прямой вызов (в обход shouldShowInterstitial) не
+  // покажет рекламу, пока флаг выключен. Штамп не пишем — иначе следующий
+  // запуск подумал бы, что игрок не досмотрел рекламу.
+  if (!interstitialsEnabled()) {
+    console.log('[ads] showInterstitialAd skipped — interstitials disabled');
+    return { shown: false, skipped: true };
+  }
   // Когда реклама началась — пишем штамп в localStorage. Если приложение
   // умрёт (свернёт игрок), при следующем запуске мы это увидим.
   writePendingTs();
@@ -266,7 +300,9 @@ export function showRewardedAd() {
 }
 
 export function shouldShowInterstitial(levelIndex) {
-  // Главный выключатель — interstitialMinLevel < 0 отключает все интерстишиалы.
+  // Главный выключатель — CONFIG.ADS.interstitialEnabled.
+  if (!interstitialsEnabled()) return false;
+  // Запасной выключатель — interstitialMinLevel < 0 тоже отключает показы.
   const minLevel = CONFIG.ADS.interstitialMinLevel;
   if (typeof minLevel !== 'number' || minLevel < 0) return false;
   // levelIndex — индекс уровня, на который только что переходит игрок.
