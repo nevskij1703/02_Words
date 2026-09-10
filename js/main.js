@@ -17,6 +17,9 @@ import { PUSH_TEMPLATES } from './pushTemplates.js';
 import * as analytics from './analytics.js';
 import { HAND_CRAFTED_LEVELS } from './levels.js';
 import { configure as rcConfigure, initRemoteConfig, rcCohorts } from './remote/remoteConfig.js';
+import { installTestBridge } from './remote/testBridge.js';
+import { tuned, warnDeclarationDrift } from './tuning.js';
+import { installTestActions } from './testActions.js';
 import rcDeclaration from './remote/declaration.js';
 import { cohortLabel } from './remote/progress.js';
 
@@ -47,6 +50,14 @@ async function bootstrap() {
   // всего остального: с этой секунды tuned() отдаёт значения сборки, даже
   // если сети нет вовсе.
   rcConfigure(rcDeclaration);
+  // Объявление против констант сборки: молча расходящаяся пара, см. tuning.js.
+  warnDeclarationDrift();
+  // ТЕСТОВЫЙ МОСТ ДО ПЕРВОГО СОБЫТИЯ: он же перехватывает то, что игра
+  // отправляет в аналитику и в рекламу, а session_start уходит в первые
+  // секунды. Ни одной команды без подписи мост не исполняет — поэтому он
+  // остаётся и в релизной сборке, где дев-панели нет.
+  installTestBridge({ appId: 'com.terekh.words', versionBase: '1.0' });
+  installTestActions();
 
   // Загрузка НЕ блокирует первый экран: конфиг нужен между уровнями, а это
   // минутами позже. У модуля свой таймаут 4 с — ждать сеть дольше игрок не
@@ -80,7 +91,7 @@ async function bootstrap() {
   pushScheduler.configure({
     appName: 'Слова',
     templates: PUSH_TEMPLATES,
-    maxPerDay: 4,
+    maxPerDay: tuned('push_max_per_day', 4),
     storageKey: 'words_push_schedule',
     getEnabled: storage.getPushEnabled,
     setEnabled: storage.setPushEnabled

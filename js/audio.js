@@ -3,6 +3,8 @@
 
 import { CONFIG } from './config.js';
 import { getSettings, setSetting } from './storage.js';
+import { tuned } from './tuning.js';
+import { onRcChange } from './remote/remoteConfig.js';
 
 let ctx = null;
 let masterGain = null;
@@ -15,7 +17,13 @@ function ensureContext() {
     if (!Ctx) return null;
     ctx = new Ctx();
     masterGain = ctx.createGain();
-    masterGain.gain.value = CONFIG.AUDIO.masterVolume;
+    masterGain.gain.value = tuned('audio_master_volume', CONFIG.AUDIO.masterVolume);
+    // ПОДПИСКА, А НЕ ОДНО ЧТЕНИЕ. Громкость ставится один раз при создании
+    // узла, а конфиг приезжает по сети позже: без подписки правка подействовала
+    // бы только со следующего запуска.
+    onRcChange(() => {
+      if (masterGain) masterGain.gain.value = tuned('audio_master_volume', CONFIG.AUDIO.masterVolume);
+    });
     masterGain.connect(ctx.destination);
   } catch (err) {
     console.warn('[audio] no AudioContext:', err);

@@ -48,8 +48,41 @@ const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 let values = {};
 let defaults = {};
 let ranges = {};
+let labels = {};
+let groups = {};
 let cohorts = [];
 let ready = false;
+let appIdSeen = null;
+
+/**
+ * Локальные подмены: дев-панель и тестовый мост.
+ *
+ * ЛЕЖАТ ПОВЕРХ ВСЕГО, включая значения группы A/B, — потому что для того и
+ * нужны: «а если поставить здесь три» проверяют на своём устройстве, не трогая
+ * бакет и не мешая живым людям.
+ *
+ * ЗАПЕРТЫ ПО УМОЛЧАНИЮ. Подмены читаются из localStorage, а localStorage в
+ * WebView можно подсунуть с отладочного мостика — поэтому пока никто не позвал
+ * `unlockOverrides`, сохранённые подмены НЕ ЧИТАЮТСЯ вовсе. В сборке для
+ * магазина замок не открывает никто: дев-панели там нет, а мост требует
+ * подписи. То есть подложенный ключ в хранилище не делает ничего.
+ */
+let overrides = {};
+let overridesOn = false;
+const overrideKeyFor = (appId) => `rc.override.${appId}`;
+
+/** Кому сообщить, что значения поменялись. Нужно живой дев-панели и мосту. */
+const listeners = new Set();
+
+function announce() {
+  for (const fn of listeners) {
+    try {
+      fn(rcAll());
+    } catch {
+      /* сломавшийся слушатель не повод ронять правку значения */
+    }
+  }
+}
 
 /**
  * Объявить дефолты и рамки — СИНХРОННО, при загрузке модуля игры.
@@ -67,7 +100,30 @@ let ready = false;
 export function configure(decl) {
   defaults = decl?.defaults ?? {};
   ranges = decl?.ranges ?? {};
+  labels = decl?.labels ?? {};
+  groups = decl?.groups ?? {};
   return rcAll();
+}
+
+/**
+ * Объявление как есть — дев-панели и мосту, чтобы построить список параметров.
+ *
+ * Отдаём КОПИЮ: панель, которая случайно допишет ключ в `ranges`, иначе
+ * разрешила бы игре применить значение, которого игра не объявляла.
+ *
+ * Копия делается через JSON, а не `structuredClone`. Это не вкусовщина:
+ * `structuredClone` появился в WebView только с 98-го Chrome, а объявление —
+ * заведомо простой JSON (числа, строки, списки), для которого разницы нет.
+ * Отсутствующая функция здесь означала бы исключение в дев-панели на старом
+ * устройстве — то есть панель, которая не открывается, при работающей игре.
+ */
+export function rcDeclaration() {
+  return {
+    defaults: { ...defaults },
+    ranges: JSON.parse(JSON.stringify(ranges)),
+    labels: { ...labels },
+    groups: { ...groups },
+  };
 }
 
 /**
@@ -76,12 +132,20 @@ export function configure(decl) {
  * конфиг» на каждом обращении не нужно.
  */
 export function rc(key) {
+  if (overridesOn && key in overrides) return overrides[key];
   return key in values ? values[key] : defaults[key];
 }
 
 /** Все значения — для дев-панели и отладки. Не для игровой логики. */
 export function rcAll() {
-  return { ...defaults, ...values };
+  return overridesOn ? { ...defaults, ...values, ...overrides } : { ...defaults, ...values };
+}
+
+/** Откуда взялось значение ключа. Нужно ровно дев-панели: править или нет. */
+export function rcSource(key) {
+  if (overridesOn && key in overrides) return "override";
+  if (key in values) return "remote";
+  return "build";
 }
 
 /** Загружен ли живой конфиг. Игровой логике знать это не нужно, дев-панели — да. */
@@ -107,22 +171,117 @@ export function rcCohorts() {
  * Ключ без объявленной рамки НЕ ПРИМЕНЯЕТСЯ вовсе: незнакомое имя означает либо
  * опечатку, либо конфиг от другой версии игры.
  */
+/**
+ * Одно значение по правилам его рамки. `undefined` — значение негодное, игра
+ * останется на своём.
+ *
+ * ДРОБЬ РАЗРЕШЕНА ТОЛЬКО ТАМ, ГДЕ ОБЪЯВЛЕН ДРОБНЫЙ ШАГ (`"step": 0.05`), и это
+ * не педантизм. Половина параметров игры — счётчики: «ядер в очереди», «побед
+ * до рекламы», «сердечек». `2.5` в таком ключе не ошибка ввода, а поломка:
+ * цикл `for (i < burstCount)` отработает три раза, а сравнение `wins === 2.5`
+ * не совпадёт никогда — то есть реклама не выйдет вовсе. Раньше сюда проходило
+ * любое конечное число, и подпись «целое от 1 до 20» была неправдой.
+ */
+function coerce(key, value) {
+  const range = ranges[key];
+  if (!range) return undefined;
+
+  if (range.oneOf) return range.oneOf.includes(value) ? value : undefined;
+
+  const num = Number(value);
+  if (!Number.isFinite(num)) return undefined;
+  if (num < range.min || num > range.max) return undefined;
+  const fractional = typeof range.step === "number" && !Number.isInteger(range.step);
+  if (!fractional && !Number.isInteger(num)) return undefined;
+  return num;
+}
+
 function sanitize(raw) {
   const out = {};
   for (const [key, value] of Object.entries(raw ?? {})) {
-    const range = ranges[key];
-    if (!range) continue;
-
-    if (range.oneOf) {
-      if (range.oneOf.includes(value)) out[key] = value;
-      continue;
-    }
-    const num = Number(value);
-    if (!Number.isFinite(num)) continue;
-    if (num < range.min || num > range.max) continue;
-    out[key] = num;
+    const ok = coerce(key, value);
+    if (ok !== undefined) out[key] = ok;
   }
   return out;
+}
+
+// ------------------------------------------------- локальные подмены
+
+/**
+ * Открыть замок подмен: с этого мгновения сохранённые подмены действуют.
+ *
+ * Зовут только дев-панель (её нет в релизной сборке) и тестовый мост (он
+ * требует подписи). Игровой код это не вызывает никогда.
+ */
+export function unlockOverrides(appId = appIdSeen) {
+  overridesOn = true;
+  appIdSeen = appId ?? appIdSeen;
+  try {
+    const raw = localStorage.getItem(overrideKeyFor(appIdSeen));
+    overrides = raw ? sanitize(JSON.parse(raw)) : {};
+  } catch {
+    overrides = {};
+  }
+  announce();
+  return { ...overrides };
+}
+
+export function overridesUnlocked() {
+  return overridesOn;
+}
+
+/** Подмены как есть. Пустой объект, пока замок закрыт. */
+export function rcOverrides() {
+  return overridesOn ? { ...overrides } : {};
+}
+
+/**
+ * Поставить локальную подмену. `undefined` — снять.
+ *
+ * Значение проходит ТЕ ЖЕ рамки, что и значение из бакета: подмена, которую
+ * игра не приняла бы из конфига, не должна проходить и с устройства, иначе
+ * проверка на устройстве проверяла бы не то, что случится у людей. Возвращает
+ * применённое значение либо `undefined`, если рамки его не пустили.
+ */
+export function setOverride(key, value) {
+  if (!overridesOn) return undefined;
+  if (value === undefined || value === null) {
+    delete overrides[key];
+  } else {
+    const ok = coerce(key, value);
+    if (ok === undefined) return undefined;
+    overrides[key] = ok;
+  }
+  persistOverrides();
+  announce();
+  return overrides[key];
+}
+
+export function clearOverrides() {
+  if (!overridesOn) return;
+  overrides = {};
+  persistOverrides();
+  announce();
+}
+
+function persistOverrides() {
+  try {
+    const key = overrideKeyFor(appIdSeen);
+    if (Object.keys(overrides).length) localStorage.setItem(key, JSON.stringify(overrides));
+    else localStorage.removeItem(key);
+  } catch {
+    /* переполненное хранилище не повод ронять дев-панель */
+  }
+}
+
+/**
+ * Подписаться на смену значений. Нужно тем играм, где параметры разложены по
+ * своим структурам (`tuning`): без подписки правка в дев-панели или с моста
+ * доехала бы только до следующего запуска.
+ */
+export function onRcChange(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
 }
 
 function readCache(appId) {
@@ -202,6 +361,9 @@ export async function initRemoteConfig(opts) {
   // иначе вызов без аргументов обнулил бы дефолты игры.
   if (opts.defaults) defaults = opts.defaults;
   if (opts.ranges) ranges = opts.ranges;
+  if (opts.labels) labels = opts.labels;
+  if (opts.groups) groups = opts.groups;
+  appIdSeen = opts.appId ?? appIdSeen;
   // Сбрасываем ПЕРЕД загрузкой, а не после удачи: иначе повторный вызов,
   // который не дошёл до сети, оставил бы значения прошлого — и «конфиг не
   // загрузился» выглядело бы как «загрузился», просто с чужими числами.
@@ -245,6 +407,11 @@ export async function initRemoteConfig(opts) {
     cohorts = chosen.groups.map(groupLabel);
     ready = true;
   }
+
+  // Подмены могли быть открыты ДО загрузки (дев-панель поднимается раньше сети):
+  // тогда их надо просеять заново — рамки к этому времени уже объявлены.
+  if (overridesOn) overrides = sanitize(overrides);
+  announce();
 
   return rcAll();
 }

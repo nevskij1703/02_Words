@@ -167,7 +167,7 @@ export async function mountGame(app, allLevels) {
           wheel.shake();
           audio.play('wrong');
           if (storage.getSettings().vibration && navigator.vibrate) {
-            navigator.vibrate(CONFIG.HAPTIC.badWordMs);
+            navigator.vibrate(tuned('haptic_bad_word_ms', CONFIG.HAPTIC.badWordMs));
           }
           setTimeout(() => { els.currentWord.textContent = ''; els.currentWord.className = 'current-word'; }, 600);
         } else if (res.kind === 'already') {
@@ -177,7 +177,7 @@ export async function mountGame(app, allLevels) {
           els.currentWord.classList.add('good');
           audio.play('correct');
           if (storage.getSettings().vibration && navigator.vibrate) {
-            navigator.vibrate(CONFIG.HAPTIC.correctWordMs);
+            navigator.vibrate(tuned('haptic_correct_word_ms', CONFIG.HAPTIC.correctWordMs));
           }
           setTimeout(() => { els.currentWord.textContent = ''; els.currentWord.className = 'current-word'; }, 700);
         } else if (res.kind === 'bonus') {

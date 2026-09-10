@@ -9,6 +9,7 @@ import { render as renderCrossword } from './crossword.js';
 import { HAND_CRAFTED_LEVELS, canFormWord } from './levels.js';
 import { DICTIONARY, normalize } from './dictionary.js';
 import { CONFIG } from './config.js';
+import { mountRcParams } from './remote/devParams.js';
 
 const STORAGE_KEY_DEV = '02words_dev_saved_levels';
 
@@ -97,9 +98,20 @@ export function mountDevPanel(app) {
         <h3 style="margin:0 0 6px">Сохранённые в localStorage</h3>
         <div id="saved-list"></div>
       </section>
+
+      <section>
+        <h3 style="margin:0 0 6px">Параметры из облака</h3>
+        <div id="rc-params"></div>
+      </section>
     </div>
   `);
   app.appendChild(panel);
+
+  // Список ВСЕХ параметров строит общий модуль админки: что крутится в админке,
+  // то же крутится здесь. Правки живут в локальном слое подмен — бакет от них
+  // не меняется.
+  const rcHost = panel.querySelector('#rc-params');
+  if (rcHost) mountRcParams(rcHost);
 
   const els = {
     letters: panel.querySelector('#f-letters'),

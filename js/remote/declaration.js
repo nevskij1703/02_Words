@@ -7,9 +7,9 @@
 
 export default {
   "_": "Что можно крутить БЕЗ выпуска обновления. Этот файл читают оба: игра берёт из него дефолты и рамки, админка (../admin) — какие поля показать и по чему проверять. Второго списка нет намеренно: он разошёлся бы с игрой на первом же новом ключе.",
-  "_defaults": "ОБЯЗАНЫ совпадать с константами сборки в js/config.js (CONFIG.ADS и CONFIG.BALANCE). Конфиг ПЕРЕБИВАЕТ значения, а не задаёт: недоступный бакет должен означать «игра как была».",
+  "_defaults": "ОБЯЗАНЫ совпадать с константами сборки в js/config.js (CONFIG.ADS, .BALANCE, .AUDIO, .HAPTIC). Расхождение видно в браузере: игра пишет о нём в консоль (warnDeclarationDrift в js/tuning.js). Конфиг ПЕРЕБИВАЕТ значения, а не задаёт: недоступный бакет должен означать «игра как была».",
   "_ranges": "Рамки обязательны, ключ без рамки игра не применит. Опечатка вроде 0 в hints_per_rewarded иначе означала бы «ролик посмотрел, подсказок не дали».",
-  "_scope": "Ритм рекламы, награда за ролик и просьба об оценке. Стартовый запас подсказок (startingHints) сюда не вынесен сознательно: он записывается в сейв при создании и участвует в миграциях, и правка из бакета означала бы правку формата сейва задним числом.",
+  "_scope": "Ритм рекламы, награда за ролик, просьба об оценке, звук, вибрация и частота напоминаний. НЕ вынесен стартовый запас подсказок (startingHints): он записывается в сейв при создании и участвует в миграциях. НЕ вынесены параметры генератора уровней (GENERATOR_DEFAULTS): уровни приезжают в сборке уже сгенерированными (js/levels.generated.js), и правка генератора из облака не изменила бы у игрока ничего.",
   "defaults": {
     "interstitial_enabled": 0,
     "interstitial_min_level": 3,
@@ -17,7 +17,12 @@ export default {
     "hints_per_rewarded": 5,
     "hints_refill_cap": 5,
     "wrong_streak_for_hint_banner": 3,
-    "rateus_after_levels": 2
+    "rateus_after_levels": 2,
+    "interstitial_pending_resume_min": 5,
+    "push_max_per_day": 4,
+    "audio_master_volume": 0.4,
+    "haptic_bad_word_ms": 80,
+    "haptic_correct_word_ms": 30
   },
   "ranges": {
     "interstitial_enabled": {
@@ -49,6 +54,27 @@ export default {
     "rateus_after_levels": {
       "min": 1,
       "max": 20
+    },
+    "interstitial_pending_resume_min": {
+      "min": 0,
+      "max": 60
+    },
+    "push_max_per_day": {
+      "min": 0,
+      "max": 8
+    },
+    "audio_master_volume": {
+      "min": 0,
+      "max": 1,
+      "step": 0.05
+    },
+    "haptic_bad_word_ms": {
+      "min": 0,
+      "max": 400
+    },
+    "haptic_correct_word_ms": {
+      "min": 0,
+      "max": 400
     }
   },
   "labels": {
@@ -58,7 +84,26 @@ export default {
     "hints_per_rewarded": "Подсказок за ролик",
     "hints_refill_cap": "После уровня +1 подсказка, пока их меньше N",
     "wrong_streak_for_hint_banner": "Кнопка подсказки после N неверных слов подряд",
-    "rateus_after_levels": "Просьба оценить после N уровней за сессию"
+    "rateus_after_levels": "Просьба оценить после N уровней за сессию",
+    "interstitial_pending_resume_min": "Догоняющий показ, если вернулся в течение N минут",
+    "push_max_per_day": "Напоминаний в день, не больше",
+    "audio_master_volume": "Общая громкость",
+    "haptic_bad_word_ms": "Вибрация на неверное слово, мс",
+    "haptic_correct_word_ms": "Вибрация на верное слово, мс"
+  },
+  "groups": {
+    "interstitial_enabled": "Реклама",
+    "interstitial_min_level": "Реклама",
+    "interstitial_cooldown_sec": "Реклама",
+    "hints_per_rewarded": "Подсказки",
+    "hints_refill_cap": "Подсказки",
+    "wrong_streak_for_hint_banner": "Подсказки",
+    "rateus_after_levels": "Оценка приложения",
+    "interstitial_pending_resume_min": "Реклама",
+    "push_max_per_day": "Уведомления",
+    "audio_master_volume": "Звук",
+    "haptic_bad_word_ms": "Вибрация",
+    "haptic_correct_word_ms": "Вибрация"
   },
   "funnel": {
     "_": "Шаги воронки прохождения. Задаётся ЗДЕСЬ, потому что знать свои события может только игра: угаданный список нарисовал бы правдоподобный график по событиям, которых нет, и обнаружилось бы это по нулям.",

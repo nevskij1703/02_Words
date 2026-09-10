@@ -190,7 +190,7 @@ export async function initAds() {
   // Восстановление: если игрок не досмотрел интерстишиал в прошлой сессии
   // и перезапустил приложение быстро — форсим показ при первом загрузке уровня.
   const pendingAt = readPendingTs();
-  const window_ = CONFIG.ADS.pendingResumeWindowMs || 5 * 60 * 1000;
+  const window_ = tuned('interstitial_pending_resume_min', (CONFIG.ADS.pendingResumeWindowMs || 5 * 60 * 1000) / 60000) * 60000;
   if (pendingAt && Date.now() - pendingAt < window_) {
     pendingResumeFlag = true;
   }
