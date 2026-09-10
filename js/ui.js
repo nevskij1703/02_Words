@@ -7,12 +7,14 @@ import * as audio from './audio.js';
 import * as ads from './ads.js';
 import * as storage from './storage.js';
 import { CONFIG } from './config.js';
+import { tuned } from './tuning.js';
 // HTML2APK:DEV_ONLY_BEGIN
 import { showCheatPanel, attachSecretTap, setHooks as setCheatHooks } from './cheatPanel.js';
 // HTML2APK:DEV_ONLY_END
 import * as tutorial from './tutorial.js';
 import * as cells from './cells.js';
 import * as rateUs from './rateUs.js';
+import { milestoneEvent } from './remote/milestones.js';
 import { showSettingsDialog } from './settings.js';
 
 // Aurora-стилистика: контурные иконки с currentColor + waves-on/off через <g>.
@@ -189,6 +191,11 @@ export async function mountGame(app, allLevels) {
     // Скрыть баннер «Использовать подсказку» при загрузке.
     hideHintBanner();
 
+    // Analytics: начало уровня. level_num — 1-based (idx 0 → уровень 1).
+    if (window.Analytics) {
+      window.Analytics.event('level_start', { level_num: idx + 1, level_id: level.id });
+    }
+
     // Тутор только на первом уровне и только если ещё не показан.
     if (tutorialControl) { tutorialControl.cancel(); tutorialControl = null; }
     if (idx === 0 && tutorial.shouldRun()) {
@@ -220,19 +227,53 @@ export async function mountGame(app, allLevels) {
     switch (ev.type) {
       case 'word-bonus':
         addBonusPill(ev.word);
+        if (window.Analytics) {
+          window.Analytics.event('word_found', {
+            word_length: (ev.word || '').length,
+            is_bonus: true,
+            level_num: currentLevelIdx + 1
+          });
+        }
         break;
       case 'word-main':
         // Сообщаем тутору, что игрок нашёл слово — тутор решит, продвинуться
         // ли на следующее, или продолжить демо текущего.
         if (tutorialControl) tutorialControl.notifyWordFound(ev.word);
+        if (window.Analytics) {
+          window.Analytics.event('word_found', {
+            word_length: (ev.word || '').length,
+            is_bonus: false,
+            level_num: currentLevelIdx + 1
+          });
+        }
         break;
       case 'level-complete':
         refillHintsAfterLevel();
         setTimeout(() => showWinScreen(), 700);
+        // Push: переплан расписания. Permission уже запросили при первом
+        // запуске app (см. main.js → bootstrap), здесь только refresh.
+        if (window.PushScheduler && storage.getPushEnabled()
+            && window.PushScheduler.getPermissionState() === 'granted') {
+          window.PushScheduler.refresh();
+        }
+        if (window.Analytics) {
+          const levelNum = currentLevelIdx + 1;
+          window.Analytics.event('level_complete', { level_num: levelNum });
+          // РУБЕЖНОЕ СОБЫТИЕ отдельным именем, а не параметром уровня. Иначе
+          // прохождение нельзя разрезать по группам A/B: параметры событий в
+          // отчётах плоские, и «номер уровня И группа» одной строкой не
+          // выражаются. Список рубежей — в remote-config.json, его же читает
+          // админка. Повтор безвреден: воронка считает разных людей.
+          const milestone = milestoneEvent(levelNum, window.RC_DECLARATION?.funnel?.milestones);
+          if (milestone) window.Analytics.event(milestone, { level_num: levelNum });
+        }
         break;
       case 'hint':
         refreshHintBadge();
         audio.play('hint');
+        if (window.Analytics) {
+          window.Analytics.event('hint_used', { level_num: currentLevelIdx + 1, source: 'free' });
+        }
         break;
       case 'hint-empty':
         showRewardedAskForHint();
@@ -252,7 +293,7 @@ export async function mountGame(app, allLevels) {
   // Пополняем подсказки после уровня до потолка (config.BALANCE.hintsRefillCap).
   function refillHintsAfterLevel() {
     const cur = storage.getHints();
-    const cap = CONFIG.BALANCE.hintsRefillCap;
+    const cap = tuned('hints_refill_cap', CONFIG.BALANCE.hintsRefillCap);
     if (cur < cap) {
       storage.addHints(1);
       refreshHintBadge();
@@ -283,8 +324,16 @@ export async function mountGame(app, allLevels) {
     }
     // Подсказок нет — сразу запускаем rewarded-рекламу.
     const res = await ads.showRewardedAd();
+    if (window.Analytics) {
+      window.Analytics.adShown({
+        type: 'rewarded',
+        placement: 'hint_banner',
+        watched: !!res?.rewarded,
+        rewardGiven: !!res?.rewarded
+      });
+    }
     if (res?.rewarded) {
-      storage.addHints(CONFIG.BALANCE.hintsPerRewardedAd);
+      storage.addHints(tuned('hints_per_rewarded', CONFIG.BALANCE.hintsPerRewardedAd));
       refreshHintBadge();
       // И сразу же используем одну для открытия буквы.
       game.useHint();
@@ -299,6 +348,7 @@ export async function mountGame(app, allLevels) {
 
   els.settingsBtn.addEventListener('click', () => {
     audio.play('click');
+    if (window.Analytics) window.Analytics.event('settings_opened');
     showSettingsDialog({ audio, storage, applyTheme });
   });
 
@@ -312,7 +362,7 @@ export async function mountGame(app, allLevels) {
     overlay.innerHTML = `
       <div class="dialog-card">
         <h3>Подсказки закончились</h3>
-        <p>Посмотрите короткую рекламу, чтобы получить +${CONFIG.BALANCE.hintsPerRewardedAd} подсказки.</p>
+        <p>Посмотрите короткую рекламу, чтобы получить +${tuned('hints_per_rewarded', CONFIG.BALANCE.hintsPerRewardedAd)} подсказки.</p>
         <div class="dialog-buttons">
           <button class="secondary" id="dlg-cancel">Отмена</button>
           <button class="primary" id="dlg-watch">Смотреть</button>
@@ -323,8 +373,16 @@ export async function mountGame(app, allLevels) {
     overlay.querySelector('#dlg-watch').addEventListener('click', async () => {
       overlay.remove();
       const { rewarded } = await ads.showRewardedAd();
+      if (window.Analytics) {
+        window.Analytics.adShown({
+          type: 'rewarded',
+          placement: 'hint_dialog',
+          watched: !!rewarded,
+          rewardGiven: !!rewarded
+        });
+      }
       if (rewarded) {
-        storage.addHints(CONFIG.BALANCE.hintsPerRewardedAd);
+        storage.addHints(tuned('hints_per_rewarded', CONFIG.BALANCE.hintsPerRewardedAd));
         refreshHintBadge();
         game.useHint();
       }
@@ -385,6 +443,9 @@ export async function mountGame(app, allLevels) {
         showInterstitial = true;
       }
       if (showInterstitial) {
+        if (window.Analytics) {
+          window.Analytics.adShown({ type: 'interstitial', placement: 'level_transition' });
+        }
         await ads.showInterstitialAd();
       }
       loadLevel(currentLevelIdx);

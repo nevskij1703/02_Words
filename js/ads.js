@@ -30,6 +30,7 @@
 //   getBackend()                          → 'native' | 'mock'
 
 import { CONFIG } from './config.js';
+import { tuned } from './tuning.js';
 
 const PENDING_KEY = '02words_pending_interstitial';
 // Таймаут на ожидание callback'а от Java. Без него Promise висит вечно
@@ -88,7 +89,10 @@ function setupNativeCallback() {
 // Интерстишиалы полностью выключены? См. CONFIG.ADS.interstitialEnabled.
 // Rewarded этим флагом НЕ управляется.
 function interstitialsEnabled() {
-  return CONFIG.ADS.interstitialEnabled !== false;
+  // Выключатель вынесен в удалённую конфигурацию: формат уже выключали из-за
+  // отзывов, и включить его обратно сейчас означало бы новую сборку. Значение
+  // 0/1, а не true/false, потому что рамки конфига числовые.
+  return tuned('interstitial_enabled', CONFIG.ADS.interstitialEnabled !== false ? 1 : 0) === 1;
 }
 
 function preloadInterstitial() {
@@ -300,16 +304,18 @@ export function showRewardedAd() {
 }
 
 export function shouldShowInterstitial(levelIndex) {
-  // Главный выключатель — CONFIG.ADS.interstitialEnabled.
+  // Главный выключатель — interstitial_enabled в конфиге.
   if (!interstitialsEnabled()) return false;
   // Запасной выключатель — interstitialMinLevel < 0 тоже отключает показы.
-  const minLevel = CONFIG.ADS.interstitialMinLevel;
+  const minLevel = tuned('interstitial_min_level', CONFIG.ADS.interstitialMinLevel);
   if (typeof minLevel !== 'number' || minLevel < 0) return false;
   // levelIndex — индекс уровня, на который только что переходит игрок.
   // По умолчанию minLevel=3 → первая возможность показа = переход на L4.
   if (levelIndex < minLevel) return false;
-  // Кулдаун между двумя успешными показами в одной сессии.
-  const cooldown = CONFIG.ADS.interstitialCooldownMs || 0;
+  // Кулдаун между двумя успешными показами в одной сессии. В конфиге он в
+  // СЕКУНДАХ: это поле правит человек, и «120» читается, а «120000»
+  // приглашает опечатку на порядок.
+  const cooldown = tuned('interstitial_cooldown_sec', (CONFIG.ADS.interstitialCooldownMs || 0) / 1000) * 1000;
   if (cooldown > 0 && lastInterstitialShownAt &&
       Date.now() - lastInterstitialShownAt < cooldown) {
     return false;

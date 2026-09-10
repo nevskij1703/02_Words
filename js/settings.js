@@ -27,6 +27,11 @@ export function showSettingsDialog({ audio, storage, applyTheme }) {
 
   const soundOn = audio.isEnabled();
   const themeDark = (storage.getSettings().theme === 'dark');
+  // Уведомления: «вкл» если pushEnabled И permission не denied. Если юзер
+  // отказал в системном dialog — показываем off.
+  const pushScheduler = window.PushScheduler;
+  const notifOn = storage.getPushEnabled()
+                  && (!pushScheduler || pushScheduler.getPermissionState() !== 'denied');
 
   overlay.innerHTML = `
     <div class="dialog-card settings-card">
@@ -48,6 +53,14 @@ export function showSettingsDialog({ audio, storage, applyTheme }) {
         </button>
       </div>
 
+      <div class="settings-row">
+        <span class="settings-label">Уведомления</span>
+        <button class="settings-toggle" id="set-notifications" role="switch"
+                aria-checked="${notifOn}" data-on="${notifOn}">
+          <span class="settings-toggle-thumb"></span>
+        </button>
+      </div>
+
       <button class="settings-privacy" id="set-privacy" type="button">
         Политика конфиденциальности
       </button>
@@ -59,6 +72,7 @@ export function showSettingsDialog({ audio, storage, applyTheme }) {
 
   const soundBtn   = overlay.querySelector('#set-sound');
   const themeBtn   = overlay.querySelector('#set-theme');
+  const notifBtn   = overlay.querySelector('#set-notifications');
   const privacyBtn = overlay.querySelector('#set-privacy');
   const closeBtn   = overlay.querySelector('#set-close');
 
@@ -82,6 +96,36 @@ export function showSettingsDialog({ audio, storage, applyTheme }) {
     setToggleState(themeBtn, next === 'dark');
     audio.play('click');
   });
+
+  // Уведомления: пишем в Storage.pushEnabled, при включении — permission
+  // request если ещё не давали. При отказе — toggle обратно в off.
+  if (notifBtn) {
+    notifBtn.addEventListener('click', () => {
+      const newOn = notifBtn.dataset.on !== 'true';
+      storage.setPushEnabled(newOn);
+      setToggleState(notifBtn, newOn);
+      audio.play('click');
+      if (newOn) {
+        const ps = window.PushScheduler;
+        if (ps && ps.getPermissionState() !== 'granted') {
+          storage.setPushPermissionAsked(true);
+          ps.requestPermission().then((result) => {
+            if (result === 'granted') ps.refresh();
+            else {
+              storage.setPushEnabled(false);
+              setToggleState(notifBtn, false);
+            }
+          });
+        } else if (ps) {
+          ps.refresh();
+        }
+      } else {
+        if (window.LocalNotifications && window.LocalNotifications.cancelAll) {
+          try { window.LocalNotifications.cancelAll(); } catch (e) {}
+        }
+      }
+    });
+  }
 
   privacyBtn.addEventListener('click', () => {
     // _blank — в браузере открывает новую вкладку; в WebView APK Android

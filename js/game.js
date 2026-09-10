@@ -22,6 +22,7 @@ import { canFormWord } from './levels.js';
 import * as storage from './storage.js';
 import * as cells from './cells.js';
 import { CONFIG } from './config.js';
+import { tuned } from './tuning.js';
 
 export function createGame({ onEvent = () => {}, crossword = null } = {}) {
   let level = null;
@@ -35,7 +36,7 @@ export function createGame({ onEvent = () => {}, crossword = null } = {}) {
 
   function noteWrong() {
     wrongStreak++;
-    if (!hintBannerVisible && wrongStreak >= CONFIG.BALANCE.wrongStreakForHintBanner) {
+    if (!hintBannerVisible && wrongStreak >= tuned('wrong_streak_for_hint_banner', CONFIG.BALANCE.wrongStreakForHintBanner)) {
       hintBannerVisible = true;
       onEvent({ type: 'show-hint-banner' });
     }

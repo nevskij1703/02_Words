@@ -19,12 +19,29 @@ export const migrations = {
     if ('version' in state) delete state.version;
     return state;
   },
-  // Пример будущей миграции:
-  // 2: (state) => {
-  //   // v1 → v2: добавили поле `coins`, дефолт 0
-  //   if (state.coins === undefined) state.coins = 0;
-  //   return state;
-  // },
+  2: (state) => {
+    // v1 → v2: добавлены поля push-уведомлений.
+    //   pushEnabled — toggle в Settings. По умолчанию true. Без permission
+    //                 всё равно ничего не показывается — безопасно.
+    //   pushPermissionAsked — флаг что мы уже запрашивали Android-permission,
+    //                         чтобы не доставать юзера повторно при каждом win.
+    if (typeof state.pushEnabled !== 'boolean') state.pushEnabled = true;
+    if (typeof state.pushPermissionAsked !== 'boolean') state.pushPermissionAsked = false;
+    return state;
+  },
+  3: (state) => {
+    // v2 → v3: добавлен userId для аналитики AppMetrica.
+    //   UUID v4 (crypto.randomUUID на WebView 92+ / Android 8+), fallback
+    //   на pseudo-UUID на старых устройствах. Один раз — на всю жизнь
+    //   установки. Юзер при чистке данных приложения получит новый ID
+    //   (новый юзер с точки зрения аналитики).
+    if (!state.userId) {
+      state.userId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : 'u-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    }
+    return state;
+  },
 };
 
 export function getCurrentSchemaVersion() {

@@ -3,8 +3,17 @@
 // Когда показываем (см. shouldShowOnLevelStart):
 //   - игрок ещё ни разу не нажимал «Оценить» (флаг 02words_rated);
 //   - текущая игровая сессия не первая (sessionNumber > 1);
-//   - в этой сессии игрок только что завершил ровно 2 уровня и переходит к 3-му;
+//   - в этой сессии игрок только что завершил ровно rateus_after_levels уровней
+//     (по умолчанию 2) и переходит к следующему;
 //   - в этой сессии окно ещё не открывалось.
+//
+// При клике «Оценить»:
+//   1) Модалка закрывается СРАЗУ (как раньше) — RuStore SDK покажет свой
+//      нативный диалог поверх WebView, и наша модалка не должна быть видна под ним.
+//   2) Fire-and-forget вызов RuStoreReview.launch() — нативный диалог оценки.
+//      Если bridge отсутствует (dev в браузере / APK без -RuStoreReviewSdk)
+//      или SDK вернул 'unavailable' (нет RuStore) — fallback на deep-link.
+//      Если 'failed' (уже оценивал / лимит) — silent, юзера не теребим.
 //
 // Что такое «игровая сессия»: одно открытие страницы. Считается через
 // sessionStorage-маркер (живёт пока вкладка открыта, переживает F5/back-forward,
@@ -18,6 +27,9 @@
 // Конфликт с интерстишиал-рекламой решается на стороне ui.js:
 // если shouldShowOnLevelStart() === true, рекламу мы НЕ запускаем
 // (см. обработчик win-next в ui.js).
+
+import { launch as launchRuStoreReview } from './rustoreReview.js';
+import { tuned } from './tuning.js';
 
 const KEY_RATED = '02words_rated';                  // '1' если игрок нажал «Оценить»
 const KEY_SESSION_COUNT = '02words_session_count';  // монотонный счётчик игровых сессий
@@ -83,7 +95,10 @@ export function shouldShowOnLevelStart(sessionLevelsCompleted) {
   if (isRated()) return false;
   if (shownThisSession) return false;
   if (getSessionNumber() <= 1) return false;       // первая сессия — пропускаем
-  if (sessionLevelsCompleted !== 2) return false;  // не тот момент сессии
+  // РОВНО столько, а не «не меньше»: окно занимает тот же слот, что и
+  // межстраничная, и «не меньше» означало бы попытку показа на каждом
+  // следующем уровне сессии.
+  if (sessionLevelsCompleted !== tuned('rateus_after_levels', 2)) return false;
   return true;
 }
 
@@ -103,9 +118,9 @@ export function clearAll() {
 //   { action: 'rate' }  — игрок нажал «Оценить» (флаг rated выставлен);
 //   { action: 'later' } — игрок нажал «Может позже» (молча закрываем).
 //
-// Кнопка «Оценить» дополнительно пробует открыть страницу приложения в сторе
-// через нативный bridge (если он есть). В браузерном dev-режиме просто
-// логируем — позже добавится реальный переход в РуСтор.
+// Кнопка «Оценить» закрывает модалку и запускает нативный RuStore in-app review
+// диалог через rustoreReview.launch(). В browser dev / APK без -RuStoreReviewSdk
+// обёртка автоматически делает fallback на deep-link rustore.ru/catalog/app.
 export function showRateUsDialog() {
   shownThisSession = true;
 
@@ -134,18 +149,16 @@ export function showRateUsDialog() {
 
     overlay.querySelector('#rate-us-rate').addEventListener('click', () => {
       markRated();
-      // Заглушка под открытие стора. Когда добавим bridge через html2apk
-      // (типа -RustoreBridge), сюда подставится реальный вызов.
-      try {
-        if (window.AppStore && typeof window.AppStore.openListing === 'function') {
-          window.AppStore.openListing();
-        } else {
-          console.log('[rateUs] would open store listing here');
-        }
-      } catch (e) {
-        console.warn('[rateUs] openListing failed:', e);
-      }
+      // 1) Закрываем модалку СРАЗУ — RuStore SDK покажет свой нативный диалог
+      //    поверх WebView, наша модалка не должна оставаться видимой под ним.
       finish('rate');
+      // 2) Fire-and-forget вызов нативного диалога оценки. Результат логируем,
+      //    в UX не возвращаем — SDK сам обрабатывает свой жизненный цикл.
+      //    rustoreReview.js делает fallback на deep-link, если bridge нет или
+      //    SDK вернул 'unavailable' (нет RuStore / устарел).
+      launchRuStoreReview().then(r => {
+        console.log('[rateUs] RuStore review result:', r);
+      }).catch(e => console.warn('[rateUs] RuStore review threw:', e));
     });
 
     overlay.querySelector('#rate-us-later').addEventListener('click', () => finish('later'));

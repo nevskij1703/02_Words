@@ -41,12 +41,14 @@ Unit-ID в [js/config.js](../js/config.js):
 
 ```
 & "$env:LOCALAPPDATA\Programs\html2apk\html2apk.ps1" `
-  -ProjectFolder "C:\Users\Александр\Desktop\Claude\02_Words" `
-  -AppName "Слова из букв" `
-  -AppId "com.terekh.words" `
-  -OutputFile "$env:USERPROFILE\Downloads\Words.apk" `
-  -YandexAdsBridge
+  -ProjectFolder "C:\Users\Александр\Desktop\Claude\RuStore-games\02_Words" `
+  -OutputFile "$env:USERPROFILE\Downloads\Words.apk"
 ```
+
+`-YandexAdsBridge`, `-AppName` и `-AppId` руками **не передавать**: они берутся
+из `.claude/build-config.json`. Источник правды один — конфиг. Флаг в командной
+строке терялся молча: команду копируют, забывают флаг, и сборка уезжает в стор
+без монетизации при полностью рабочем рекламном коде.
 
 html2apk автоматически добавляет gradle-зависимость, ACCESS_NETWORK_STATE, `YandexAdsBridge.java` и патчит MainActivity. Подробности — в `01_RS_GlitterSort/docs/ADS.md` (там же полный исходник Java-моста).
 

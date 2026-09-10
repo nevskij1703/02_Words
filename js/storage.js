@@ -14,7 +14,14 @@ const DEFAULT_STATE = () => ({
   foundBonusByLevel: {},        // { [levelId]: ['СЛОВО', ...] }
   revealedCellsByLevel: {},     // { [levelId]: [[row, col], ...] }
   stats: { levelsCompleted: 0, wordsFound: 0 },
-  settings: { sound: CONFIG.AUDIO.defaultEnabled, vibration: CONFIG.HAPTIC.defaultEnabled }
+  settings: { sound: CONFIG.AUDIO.defaultEnabled, vibration: CONFIG.HAPTIC.defaultEnabled },
+  // Push-уведомления. См. migration[2] и pushScheduler.js.
+  pushEnabled: true,
+  pushPermissionAsked: false,
+  // Аналитика AppMetrica. См. migration[3] и analytics.js.
+  // При первой загрузке миграция 3 заполнит UUID; для свежих инсталлов
+  // (без миграции) getUserId() генерирует лениво при первом обращении.
+  userId: null
 });
 
 let cached = null;
@@ -158,4 +165,23 @@ export function incWordsFound(n = 1) {
 export function getSettings() { return load().settings; }
 export function setSetting(key, val) {
   update(s => { s.settings[key] = val; });
+}
+
+// Push-уведомления
+export function getPushEnabled() { return load().pushEnabled !== false; }
+export function setPushEnabled(v) { update(s => { s.pushEnabled = !!v; }); }
+export function getPushPermissionAsked() { return !!load().pushPermissionAsked; }
+export function setPushPermissionAsked(v) { update(s => { s.pushPermissionAsked = !!v; }); }
+
+// AppMetrica analytics — стабильный UUID, генерируется при первом обращении
+// если миграция 3 ещё не выставила его (например, fresh install без миграций).
+export function getUserId() {
+  const state = load();
+  if (!state.userId) {
+    state.userId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : 'u-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    save();
+  }
+  return state.userId;
 }
