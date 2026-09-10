@@ -18,6 +18,7 @@ import * as analytics from './analytics.js';
 import { HAND_CRAFTED_LEVELS } from './levels.js';
 import { configure as rcConfigure, initRemoteConfig, rcCohorts } from './remote/remoteConfig.js';
 import rcDeclaration from './remote/declaration.js';
+import { cohortLabel } from './remote/progress.js';
 
 async function bootstrap() {
   storage.load();
@@ -63,7 +64,9 @@ async function bootstrap() {
     // поэтому жребий не меняется от запуска к запуску.
     installId: storage.getUserId()
   }).then(() => {
-    analytics.setAbCohorts(rcCohorts().join(','));
+    // `cohortLabel`, а не `join`: вне тестов нужна метка `default`. Пустая
+    // строка означала бы «конфиг ещё не доехал», а это другое.
+    analytics.setAbCohorts(cohortLabel(rcCohorts()));
   }).catch(() => {
     /* нет сети — играем на значениях сборки, это штатно */
   }).then(() => {
