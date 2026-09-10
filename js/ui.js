@@ -14,7 +14,8 @@ import { showCheatPanel, attachSecretTap, setHooks as setCheatHooks } from './ch
 import * as tutorial from './tutorial.js';
 import * as cells from './cells.js';
 import * as rateUs from './rateUs.js';
-import { milestoneEvent } from './remote/milestones.js';
+import { progressParams } from './remote/progress.js';
+import { rcCohorts } from './remote/remoteConfig.js';
 import { showSettingsDialog } from './settings.js';
 
 // Aurora-стилистика: контурные иконки с currentColor + waves-on/off через <g>.
@@ -193,7 +194,14 @@ export async function mountGame(app, allLevels) {
 
     // Analytics: начало уровня. level_num — 1-based (idx 0 → уровень 1).
     if (window.Analytics) {
-      window.Analytics.event('level_start', { level_num: idx + 1, level_id: level.id });
+      // Уровень И группа A/B одной ВЛОЖЕННОЙ ветвью параметров: только так их
+      // можно пересечь в отчёте. Плоские `level_num` и `ab` рядом дают две
+      // соседние ветви, а соседние ветви не пересекаются.
+      window.Analytics.event('level_start', {
+        level_num: idx + 1,
+        level_id: level.id,
+        ...progressParams(idx + 1, rcCohorts()),
+      });
     }
 
     // Тутор только на первом уровне и только если ещё не показан.
@@ -257,15 +265,7 @@ export async function mountGame(app, allLevels) {
           window.PushScheduler.refresh();
         }
         if (window.Analytics) {
-          const levelNum = currentLevelIdx + 1;
-          window.Analytics.event('level_complete', { level_num: levelNum });
-          // РУБЕЖНОЕ СОБЫТИЕ отдельным именем, а не параметром уровня. Иначе
-          // прохождение нельзя разрезать по группам A/B: параметры событий в
-          // отчётах плоские, и «номер уровня И группа» одной строкой не
-          // выражаются. Список рубежей — в remote-config.json, его же читает
-          // админка. Повтор безвреден: воронка считает разных людей.
-          const milestone = milestoneEvent(levelNum, window.RC_DECLARATION?.funnel?.milestones);
-          if (milestone) window.Analytics.event(milestone, { level_num: levelNum });
+          window.Analytics.event('level_complete', { level_num: currentLevelIdx + 1 });
         }
         break;
       case 'hint':
