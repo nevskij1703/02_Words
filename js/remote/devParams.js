@@ -23,6 +23,7 @@
 // В classic-JS — `window.RemoteConfig.mountRcParams(panelElement)`.
 
 import { paramGroups, rangeText } from "./params.js";
+import { curveError, curvePreview, parseCurve } from "./curve.js";
 import {
   clearOverrides,
   onRcChange,
@@ -63,6 +64,10 @@ const CSS = `
 [data-rc-params] .rcp-row input,[data-rc-params] .rcp-row select{
   flex:0 0 92px;width:92px;background:#1b1b21;color:#fff;border:1px solid #3a3a42;border-radius:6px;padding:3px 6px;font:inherit}
 [data-rc-params] .rcp-row.rcp-over input,[data-rc-params] .rcp-row.rcp-over select{border-color:#f0b429}
+/* Кривая сложности — строка, и в 92 пикселя она не видна вовсе. Строка стоит
+   под подписью, а не рядом: на телефоне рядом остаётся сантиметр. */
+[data-rc-params] .rcp-row.rcp-curve{display:block}
+[data-rc-params] .rcp-row.rcp-curve input{flex:none;width:100%;margin-top:4px;font-family:ui-monospace,monospace}
 [data-rc-params] .rcp-x{flex:0 0 auto;width:22px;background:transparent;border:0;color:#8a8a94;cursor:pointer;font:inherit}
 [data-rc-params] .rcp-head{display:flex;align-items:center;gap:8px;padding:4px 0 6px;color:#8a8a94}
 [data-rc-params] .rcp-head button{background:#2f2f38;color:#fff;border:1px solid #3a3a42;border-radius:6px;padding:3px 8px;font:inherit;cursor:pointer}
@@ -158,28 +163,52 @@ function row(key, decl, values, over) {
     // показывало бы одно, а игра работала бы по другому.
     if (applied === undefined && raw !== undefined) {
       input.style.borderColor = "#e5484d";
-      input.title = `не в рамках: ${rangeText(range)}`;
+      // У кривой причина словами: «не в рамках» ничего не объясняет там, где
+      // ошибиться можно десятком способов — забыть скобку, написать 12, влепить
+      // два дефиса подряд.
+      input.title = range.kind === "curve"
+        ? (curveError(raw, range) ?? rangeText(range))
+        : `не в рамках: ${rangeText(range)}`;
     }
   };
 
-  const input = range.oneOf
-    ? mk("select", { onchange: (e) => apply(coerceOneOf(range, e.target.value)) },
-        ...range.oneOf.map((o) =>
-          mk("option", { value: String(o), selected: String(o) === String(value) ? "" : null }, String(o))))
-    : mk("input", {
-        type: "number", value: String(value ?? ""),
-        min: range.min, max: range.max, step: range.step ?? 1,
-        onchange: (e) => apply(e.target.value === "" ? undefined : Number(e.target.value)),
-      });
+  const input = range.kind === "curve"
+    ? mk("input", {
+        type: "text", value: String(value ?? ""), spellcheck: "false",
+        onchange: (e) => apply(e.target.value.trim() === "" ? undefined : e.target.value),
+      })
+    : range.oneOf
+      ? mk("select", { onchange: (e) => apply(coerceOneOf(range, e.target.value)) },
+          ...range.oneOf.map((o) =>
+            mk("option", { value: String(o), selected: String(o) === String(value) ? "" : null }, String(o))))
+      : mk("input", {
+          type: "number", value: String(value ?? ""),
+          min: range.min, max: range.max, step: range.step ?? 1,
+          onchange: (e) => apply(e.target.value === "" ? undefined : Number(e.target.value)),
+        });
 
-  return mk("div", { class: mine ? "rcp-row rcp-over" : "rcp-row" },
+  const classes = ["rcp-row"];
+  if (mine) classes.push("rcp-over");
+  if (range.kind === "curve") classes.push("rcp-curve");
+
+  return mk("div", { class: classes.join(" ") },
     mk("div", { class: "rcp-key" },
       label ?? key,
-      mk("small", {}, `${key} · ${rangeText(range)} · в сборке ${decl.defaults[key]}`)),
+      mk("small", {}, `${key} · ${rangeText(range)} · в сборке ${decl.defaults[key]}`),
+      // Превью читается быстрее записи: «какой уровень получится пятым» по
+      // строке со скобкой в уме считает не каждый.
+      range.kind === "curve" ? mk("small", {}, previewText(value, range)) : null),
     input,
     mine
       ? mk("button", { class: "rcp-x", type: "button", title: "снять подмену", onclick: () => setOverride(key, undefined) }, "×")
       : mk("span", { class: "rcp-x" }, sourceMark(key)));
+}
+
+/** Первые уровни кривой словами: «уровни 1-10: 1 3 3 6 4 4 7 4 4 10». */
+function previewText(value, range) {
+  const curve = parseCurve(value, range);
+  if (!curve) return "строку разобрать не удалось";
+  return `уровни 1-10: ${curvePreview(curve, 10).join(" ")}`;
 }
 
 /** `oneOf` бывает и строковым (`"rotational"`), и числовым — из select приходит строка. */

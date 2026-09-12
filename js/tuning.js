@@ -55,6 +55,7 @@ export function warnDeclarationDrift() {
     interstitial_min_level: A.interstitialMinLevel,
     interstitial_cooldown_sec: Math.round((A.interstitialCooldownMs || 0) / 1000),
     interstitial_pending_resume_min: Math.round((A.pendingResumeWindowMs || 0) / 60000),
+    hints_start: B.startingHints,
     hints_per_rewarded: B.hintsPerRewardedAd,
     hints_refill_cap: B.hintsRefillCap,
     wrong_streak_for_hint_banner: B.wrongStreakForHintBanner,

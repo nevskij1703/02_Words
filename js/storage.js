@@ -10,7 +10,11 @@ const DEFAULT_STATE = () => ({
   schemaVersion: getCurrentSchemaVersion(),
   currentLevel: 0,
   completedLevels: [],          // [levelId, ...]
+  // Значение СБОРКИ. Ключ `hints_start` правит его не здесь, а один раз после
+  // ответа сети — см. `applyStartGrant` ниже.
   hints: CONFIG.BALANCE.startingHints,
+  // Поправка стартового запаса из конфига ещё не применялась. См. migration[4].
+  startAdjusted: false,
   foundBonusByLevel: {},        // { [levelId]: ['СЛОВО', ...] }
   revealedCellsByLevel: {},     // { [levelId]: [[row, col], ...] }
   stats: { levelsCompleted: 0, wordsFound: 0 },
@@ -112,6 +116,35 @@ export function reset() {
 
 export function getCurrentLevel() { return load().currentLevel; }
 export function setCurrentLevel(idx) { update(s => { s.currentLevel = idx; }); }
+
+/**
+ * Довести стартовый запас подсказок до того, что сказал конфиг. Один раз за
+ * жизнь установки, сразу после ответа сети.
+ *
+ * ПОЧЕМУ НЕ `hints: tuned('hints_start', ...)` В DEFAULT_STATE. Сейв рождается
+ * раньше конфига: `storage.load()` — первая строка `bootstrap()`, а у загрузки
+ * конфига свой таймаут в 4 секунды. Ключ, прочитанный там, вернул бы значение
+ * сборки у КАЖДОГО нового игрока — то есть ровно у тех, ради кого он заведён.
+ *
+ * ПРИБАВЛЯЕМ РАЗНИЦУ, А НЕ ПРИСВАИВАЕМ: пока отвечает сеть, игрок уже мог
+ * потратить подсказку. Присвоение вернуло бы её обратно, а при меньшем значении
+ * в бакете отняло бы лишнюю. Разница верна в любой момент — конфиг говорит не
+ * «столько у тебя сейчас», а «столько выдать на входе».
+ *
+ * Конфиг не доехал — `tuned` отдаёт значение сборки, разница нулевая, и функция
+ * не делает ничего.
+ */
+export function applyStartGrant(startHints) {
+  update((s) => {
+    if (s.startAdjusted) return;
+    s.startAdjusted = true;
+    // Уровень уже пройден — стартовый запас своё отработал, и поправка
+    // означала бы правку кошелька играющего человека.
+    if (s.completedLevels.length === 0) {
+      s.hints = Math.max(0, s.hints + (startHints - CONFIG.BALANCE.startingHints));
+    }
+  });
+}
 
 export function getHints() { return load().hints; }
 export function addHints(n) { update(s => { s.hints = Math.max(0, s.hints + n); }); }

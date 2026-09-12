@@ -117,6 +117,9 @@ export function paramLabel(decl, key) {
 /** Рамка словами — одинаково в подсказке админки и в дев-панели. */
 export function rangeText(range) {
   if (!range) return "рамки не объявлены";
+  if (range.kind === "curve") {
+    return `кривая: разгон и цикл в скобках, рейтинги ${range.min ?? 1}..${range.max ?? 10}`;
+  }
   if (range.oneOf) return `одно из: ${range.oneOf.join(", ")}`;
   const fractional = typeof range.step === "number" && !Number.isInteger(range.step);
   const kind = fractional ? "дробное" : "целое";

@@ -42,6 +42,18 @@ export const migrations = {
     }
     return state;
   },
+  4: (state) => {
+    // v3 → v4: стартовый запас подсказок стал ключом конфига (`hints_start`),
+    // и его правка применяется ОДИН раз — отсюда флаг.
+    //
+    // Тем, кто уже играет, ставим `true`: свои стартовые подсказки они получили
+    // при установке, и поправка на разницу с бакетом отняла бы у них запас
+    // посреди игры. `false` бывает только у сейва из DEFAULT_STATE, то есть у
+    // настоящего нового игрока. Зачем это вообще — `applyStartGrant` в
+    // `js/storage.js`.
+    if (typeof state.startAdjusted !== 'boolean') state.startAdjusted = true;
+    return state;
+  },
 };
 
 export function getCurrentSchemaVersion() {

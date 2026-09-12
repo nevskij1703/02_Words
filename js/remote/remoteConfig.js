@@ -27,6 +27,7 @@
 // кладёт то же самое в `window.RemoteConfig` (см. build-iife.mjs).
 
 import { pickGroups, groupLabel } from "./abTest.js";
+import { formatCurve, parseCurve } from "./curve.js";
 
 const CDN = "https://games-config-b1g8r9eo.storage.yandexcloud.net";
 
@@ -185,6 +186,15 @@ export function rcCohorts() {
 function coerce(key, value) {
   const range = ranges[key];
   if (!range) return undefined;
+
+  // Кривая сложности — единственное значение-строка. Проверяется тем же
+  // разбором, что и в поле ввода админки (`client/curve.js`), и возвращается
+  // НОРМАЛИЗОВАННОЙ: в бакете может лежать «1-3 - (4-5)», а игра и админка
+  // обязаны видеть одну запись, иначе «поменялось ли» решается по пробелам.
+  if (range.kind === "curve") {
+    const curve = parseCurve(value, range);
+    return curve ? formatCurve(curve) : undefined;
+  }
 
   if (range.oneOf) return range.oneOf.includes(value) ? value : undefined;
 
