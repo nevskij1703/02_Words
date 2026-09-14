@@ -12,10 +12,22 @@
 //   - applyTheme  — функция из ui.js: применяет тему к DOM и сохраняет.
 //                   (Локальна для mountGame closure, поэтому пробрасываем.)
 //
-// URL политики зафиксирован в одном месте — PRIVACY_URL ниже. Если когда-то
-// сменим хостинг (Yandex Disk → Google Drive и т.п.), правим только здесь.
+// URL политики зафиксирован в одном месте — PRIVACY_URL ниже.
+//
+// ОБЩИЙ САЙТ ПОЛИТИК, а не чьё-то личное облако. Прежний адрес на cloud.mail.ru
+// требовал ручной перезаливки через личный кабинет: пока текст лежал там,
+// действующая редакция зависела от того, вспомнил ли кто-то залить файл. Здесь
+// источник — `Store_Info/PRIVACY_POLICY.md` в git, выкладка одной командой, а
+// адрес строится из appId, который после первой публикации менять нельзя, —
+// значит ссылка стабильна. Старую ссылку НЕ удалять: на неё смотрят уже
+// опубликованные сборки. Подробности — admin/docs/LEGAL.md.
+const PRIVACY_URL = 'https://games-legal-b1g8r9eo.website.yandexcloud.net/words/privacy.html';
 
-const PRIVACY_URL = 'https://cloud.mail.ru/public/3PaG/kcZCUtPur';
+// Запасная копия В САМОМ APK на случай, когда сети нет. Игру открывают в метро
+// и в очереди, и отправлять игрока за юридическим текстом в интернет там значит
+// показать пустой экран. Копию кладёт `node ../admin/tools/make-privacy.mjs` из
+// того же .md.
+const PRIVACY_URL_OFFLINE = './privacy.html';
 
 export function showSettingsDialog({ audio, storage, applyTheme }) {
   // Если уже открыто — не дублируем (например, повторный тап по кнопке).
@@ -131,7 +143,10 @@ export function showSettingsDialog({ audio, storage, applyTheme }) {
     // _blank — в браузере открывает новую вкладку; в WebView APK Android
     // переадресует на ACTION_VIEW intent → откроется во внешнем браузере.
     // noopener — стандартная защита.
-    try { window.open(PRIVACY_URL, '_blank', 'noopener'); }
+    // Адрес выбираем В МОМЕНТ НАЖАТИЯ, а не при загрузке модуля: сеть
+    // появляется и пропадает, а игра живёт сеансами по полчаса.
+    const url = navigator.onLine === false ? PRIVACY_URL_OFFLINE : PRIVACY_URL;
+    try { window.open(url, '_blank', 'noopener'); }
     catch (e) { console.warn('[settings] privacy open failed', e); }
   });
 
