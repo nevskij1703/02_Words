@@ -119,10 +119,12 @@ async function bootstrap() {
   } else {
     pushScheduler.refresh();
   }
-  // Вход и уход — очередь заново от этого момента. Без этого вернувшийся из
-  // фона (без нового запуска) получал бы напоминания, рассчитанные на того,
-  // кто не заходит.
-  document.addEventListener('visibilitychange', () => pushScheduler.refresh());
+  // Вход из фона — очередь заново от этого момента. Без этого вернувшийся без
+  // нового запуска получал бы напоминания, рассчитанные на того, кто не
+  // заходит. На уходе не переставляем: дни расписания календарные.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') pushScheduler.refresh();
+  });
 
   const params = new URLSearchParams(location.search);
   const devMode = CONFIG.DEV.enabled && params.get('dev') === '1';
