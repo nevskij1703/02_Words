@@ -106,18 +106,23 @@ async function bootstrap() {
   window.PushScheduler = pushScheduler;
   // Permission запрашиваем СРАЗУ при первом запуске приложения
   // (pushPermissionAsked === false). См. SKILL connect-local-notifications.
+  // refresh — при любом ответе и любом тумблере: без разрешения и выключенному
+  // он только снимает очередь, в которой может лежать дописанное мостом.
   if (!storage.getPushPermissionAsked() && storage.getPushEnabled()) {
     storage.setPushPermissionAsked(true);
     setTimeout(() => {
       pushScheduler.requestPermission().then(result => {
         console.log('[push] permission result:', result);
-        if (result === 'granted') pushScheduler.refresh();
+        pushScheduler.refresh();
       });
     }, 800);
-  } else if (pushScheduler.getPermissionState() === 'granted'
-             && storage.getPushEnabled()) {
+  } else {
     pushScheduler.refresh();
   }
+  // Вход и уход — очередь заново от этого момента. Без этого вернувшийся из
+  // фона (без нового запуска) получал бы напоминания, рассчитанные на того,
+  // кто не заходит.
+  document.addEventListener('visibilitychange', () => pushScheduler.refresh());
 
   const params = new URLSearchParams(location.search);
   const devMode = CONFIG.DEV.enabled && params.get('dev') === '1';

@@ -131,10 +131,10 @@ export function showSettingsDialog({ audio, storage, applyTheme }) {
         } else if (ps) {
           ps.refresh();
         }
-      } else {
-        if (window.LocalNotifications && window.LocalNotifications.cancelAll) {
-          try { window.LocalNotifications.cancelAll(); } catch (e) {}
-        }
+      } else if (window.PushScheduler) {
+        // Выключенному refresh только снимает очередь — вместе с тем, что мост
+        // дописал сам.
+        window.PushScheduler.refresh();
       }
     });
   }
